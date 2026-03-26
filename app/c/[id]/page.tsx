@@ -59,7 +59,37 @@ export default function LandingPageGourmetFinal() {
     }
     fetchData()
   }, [id])
+const enviarNotificacaoTelegram = async (order: any) => {
+  const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN; // Usamos NEXT_PUBLIC para teste rápido
+  const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
 
+  const mensagem = `
+💰 *NOVO PEDIDO NO COMPRAZAP!*
+--------------------------------
+📦 *Produto:* ${campaign?.title}
+👤 *Cliente:* ${order.buyer_name}
+🏠 *Apto:* ${order.buyer_apto}
+🔢 *Qtd:* ${order.quantity}x
+✨ *Opções:* ${JSON.stringify(order.selected_variations)}
+💵 *Total:* R$ ${(product.price * order.quantity).toFixed(2)}
+--------------------------------
+📱 *Contato:* ${order.buyer_contact}
+  `;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: mensagem,
+        parse_mode: 'Markdown'
+      })
+    });
+  } catch (err) {
+    console.error("Erro ao avisar Telegram:", err);
+  }
+};
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -86,6 +116,7 @@ export default function LandingPageGourmetFinal() {
       if (data) {
         setOrderId(data.id)
         setStep('checkout')
+        enviarNotificacaoTelegram(data);
       }
     } catch (err: any) {
       alert("Erro ao confirmar reserva: " + err.message)
