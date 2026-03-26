@@ -20,22 +20,40 @@ export default function PortalCondominio() {
   }
 
   const handleLogin = async () => {
-    if (phone.length < 14) return alert("Telefone inválido")
-    setLoading(true)
-    
-    // 1. Tenta achar ou criar o perfil
-    let { data: profile } = await supabase.from('profiles').select('*').eq('phone', phone).single()
-    
+  if (phone.length < 14) return alert("Telefone inválido");
+  setLoading(true);
+  
+  try {
+    // Busca o perfil
+    let { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('phone', phone)
+      .maybeSingle(); // maybeSingle é mais seguro que single() aqui
+
     if (!profile) {
-      const { data: newProfile } = await supabase.from('profiles').insert({ phone, full_name: 'Vizinho Novo' }).select().single()
-      profile = newProfile
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({ phone, full_name: 'Vizinho' })
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
+      profile = newProfile;
     }
 
-    localStorage.setItem('user_phone', phone)
-    localStorage.setItem('user_id', profile.id)
-    setIsLoggedIn(true)
-    fetchUserActivity(phone, profile.id)
+    localStorage.setItem('user_phone', phone);
+    localStorage.setItem('user_id', profile.id);
+    setIsLoggedIn(true);
+    fetchUserActivity(phone, profile.id);
+
+  } catch (error: any) {
+    console.error(error);
+    alert("Erro ao entrar: " + error.message);
+  } finally {
+    setLoading(false);
   }
+}
 
   const fetchUserActivity = async (userPhone: string, userId: string) => {
     // Buscar compras feitas
