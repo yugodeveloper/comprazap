@@ -29,6 +29,7 @@ export default function LandingPageGourmetFinal() {
   const [uploading, setUploading] = useState(false)
   const [currentReceipt, setCurrentReceipt] = useState<string | null>(null)
 
+  // --- 1. CARREGAMENTO INICIAL ---
   useEffect(() => {
     if (!id) return
     const fetchData = async () => {
@@ -43,7 +44,6 @@ export default function LandingPageGourmetFinal() {
         const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp.creator_id).single()
         setSeller(sl)
 
-        // Inicializar variações genéricas (ex: Tamanho, Sabor)
         if (pd?.variations) {
           const defaults: any = {}
           Object.keys(pd.variations).forEach(key => {
@@ -59,16 +59,41 @@ export default function LandingPageGourmetFinal() {
     }
     fetchData()
   }, [id])
-const enviarNotificacaoTelegram = async (order: any) => {
-const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
 
-  if (!token || !chatId) {
-    console.error("Erro: Variáveis do Telegram não configuradas.");
-    return;
-  }
+  // --- 2. ESCUTA EM TEMPO REAL (REALTIME) ---
+  useEffect(() => {
+    if (!orderId) return;
 
-  const mensagem = `
+    const subscription = supabase
+      .channel('status-order')
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'orders', 
+        filter: `id=eq.${orderId}` 
+      }, 
+      (payload) => {
+        if (payload.new.status === 'paid') {
+          alert("🎉 Pagamento confirmado pelo vendedor!");
+          setCurrentReceipt('confirmed');
+        } else if (payload.new.status === 'rejected') {
+          alert("⚠️ Comprovante inválido. Por favor, envie novamente.");
+          setCurrentReceipt(null); // Reseta para permitir novo upload
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(subscription) };
+  }, [orderId]);
+
+  // --- 3. FUNÇÕES DE NOTIFICAÇÃO TELEGRAM ---
+  const enviarNotificacaoTelegram = async (order: any) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+
+    if (!token || !chatId) return;
+
+    const mensagem = `
 💰 *NOVO PEDIDO NO COMPRAZAP!*
 --------------------------------
 📦 *Produto:* ${campaign?.title}
@@ -79,43 +104,42 @@ const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
 💵 *Total:* R$ ${(product.price * order.quantity).toFixed(2)}
 --------------------------------
 📱 *Contato:* ${order.buyer_contact}
-  `;
+    `;
 
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: mensagem,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch (err) {
-    console.error("Erro ao avisar Telegram:", err);
-  }
-};
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' })
+      });
+    } catch (err) { console.error("Erro Telegram:", err); }
+  };
 
-const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
-  const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
 
-  try {
     await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
         photo: imageUrl,
-        caption: `✅ *PAGAMENTO RECEBIDO!*\n👤 Cliente: ${buyer}\n🖼️ Comprovante acima.`,
-        parse_mode: 'Markdown'
+        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n\nVocê aceita este pagamento?`,
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Aceitar", callback_data: `confirm_${oId}` },
+              { text: "❌ Recusar", callback_data: `reject_${oId}` }
+            ]
+          ]
+        }
       })
     });
-  } catch (err) {
-    console.error("Erro ao enviar foto para Telegram:", err);
-  }
-};
+  };
 
+  // --- 4. HANDLERS (AÇÕES) ---
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -132,11 +156,7 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
         quantity: quantity
       }
 
-      const { data, error } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select()
-        .single()
+      const { data, error } = await supabase.from('orders').insert(orderData).select().single()
 
       if (error) throw error
       if (data) {
@@ -162,7 +182,10 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
       await supabase.from('orders').update({ receipt_url: publicUrl }).eq('id', orderId)
-      await enviarComprovanteTelegram(publicUrl, buyerName);
+      
+      // Enviando o orderId como 3º argumento
+      await enviarComprovanteTelegram(publicUrl, buyerName, orderId);
+      
       setCurrentReceipt(publicUrl)
     }
     setUploading(false)
@@ -180,14 +203,9 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
       <div className="mx-auto max-w-md bg-white min-h-screen shadow-2xl overflow-hidden">
         
-        {/* HEADER COM IMAGEM */}
         <div className="relative h-72 w-full bg-slate-200">
           {campaign?.image_url ? (
-            <img 
-              src={campaign.image_url} 
-              alt="Capa" 
-              className="h-full w-full object-cover"
-            />
+            <img src={campaign.image_url} alt="Capa" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-6xl">🎁</div>
           )}
@@ -201,37 +219,26 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
         </div>
 
         <div className="p-6 space-y-8">
-          
-          {/* DESCRIÇÃO */}
           <div className="border-b border-slate-100 pb-6">
             <p className="text-slate-500 text-sm leading-relaxed">{campaign?.description}</p>
           </div>
 
-          {/* PASSO 1: IDENTIFICAÇÃO (Login Minimalista) */}
           {step === 'identificacao' && (
             <div className="space-y-4 animate-in fade-in duration-500">
               <h2 className="text-lg font-bold text-slate-900">Para começar, seu contato:</h2>
               <input 
-                type="text" 
-                placeholder="E-mail ou WhatsApp" 
-                className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 transition-all font-medium"
-                value={contact} 
-                onChange={e => setContact(e.target.value)}
+                type="text" placeholder="E-mail ou WhatsApp" 
+                className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 font-medium"
+                value={contact} onChange={e => setContact(e.target.value)}
               />
-              <button 
-                onClick={() => setStep('reserva')}
-                className="w-full rounded-2xl bg-slate-900 p-5 font-black text-white shadow-xl hover:bg-slate-800 active:scale-95 transition-all"
-              >
+              <button onClick={() => setStep('reserva')} className="w-full rounded-2xl bg-slate-900 p-5 font-black text-white shadow-xl hover:bg-slate-800 active:scale-95 transition-all">
                 CONTINUAR PARA RESERVA
               </button>
             </div>
           )}
 
-          {/* PASSO 2: FORMULÁRIO DE SELEÇÃO E DADOS */}
           {step === 'reserva' && (
             <form onSubmit={handleOrder} className="space-y-6 animate-in slide-in-from-right duration-500">
-              
-              {/* VARIAÇÕES DINÂMICAS (Ex: Sabor, Tamanho) */}
               {product?.variations && Object.keys(product.variations).map(key => (
                 <div key={key} className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{key}</label>
@@ -253,27 +260,23 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
                 </div>
               ))}
 
-              {/* SELETOR DE QUANTIDADE */}
               <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100">
                 <span className="font-bold text-slate-700">Quantidade</span>
                 <div className="flex items-center gap-4">
-                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black border border-slate-200 text-slate-900 hover:bg-slate-50">-</button>
+                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black border border-slate-200 text-slate-900">-</button>
                   <span className="font-mono font-black text-lg text-slate-900 w-6 text-center">{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black border border-slate-200 text-slate-900 hover:bg-slate-50">+</button>
+                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black border border-slate-200 text-slate-900">+</button>
                 </div>
               </div>
 
-              {/* IDENTIFICAÇÃO FINAL */}
               <div className="space-y-4 pt-4 border-t border-slate-50">
                 <input 
-                  placeholder="Seu Nome Completo" 
-                  required 
+                  placeholder="Seu Nome Completo" required 
                   className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 font-medium" 
                   value={buyerName} onChange={e => setBuyerName(e.target.value)} 
                 />
                 <input 
-                  placeholder="Apto / Unidade" 
-                  required 
+                  placeholder="Apto / Unidade" required 
                   className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 font-medium" 
                   value={buyerApto} onChange={e => setBuyerApto(e.target.value)} 
                 />
@@ -285,7 +288,6 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
             </form>
           )}
 
-          {/* PASSO 3: CHECKOUT (PIX + QR CODE) */}
           {step === 'checkout' && (
             <div className="space-y-6 text-center animate-in zoom-in duration-500">
               <div className="rounded-[40px] bg-slate-900 p-8 text-white shadow-2xl">
@@ -305,19 +307,20 @@ const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
                 </div>
               </div>
 
-              {/* ÁREA DE COMPROVANTE */}
               <div className="rounded-3xl bg-white p-6 border-2 border-dashed border-slate-200">
                 <p className="mb-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Enviar Comprovante</p>
                 <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleFileUpload}
+                  type="file" accept="image/*" onChange={handleFileUpload}
                   className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-900 file:text-white file:font-bold cursor-pointer" 
                 />
                 
-                {currentReceipt && (
-                  <div className="mt-4 p-4 bg-green-50 rounded-xl text-green-700 text-sm font-bold flex items-center justify-center gap-2">
-                    ✅ Comprovante Recebido!
+                {currentReceipt && currentReceipt === 'confirmed' ? (
+                   <div className="mt-4 p-4 bg-green-100 rounded-xl text-green-700 text-sm font-bold flex items-center justify-center gap-2">
+                   🚀 Pagamento Confirmado! Prepare-se para receber.
+                 </div>
+                ) : currentReceipt && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm font-bold flex items-center justify-center gap-2">
+                    ✅ Comprovante em análise...
                   </div>
                 )}
                 
