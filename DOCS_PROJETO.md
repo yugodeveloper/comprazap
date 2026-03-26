@@ -1,54 +1,54 @@
-# 🛒 CompraZap - Manifesto do Projeto v9.0 (Live na Vercel)
+# 🛒 CompraZap - Manifesto do Projeto v15.0
 
 ## 📌 Visão Geral
-Sistema agnóstico de intermediação de vendas direta em condomínios. 
-Permite que vendedores (ex: Café Gourmet, Cuca de Banana) criem ofertas personalizadas e que vizinhos comprem via Pix com upload de comprovante, sem necessidade de login complexo.
+Plataforma de micro-vendas para condomínios. O sistema permite que vendedores independentes (Cucas, Cafés, Artesanatos) gerenciem pedidos de forma automatizada via Telegram, oferecendo uma experiência fluida de checkout para os vizinhos.
 
 ---
 
-## 🏗️ Arquitetura Técnica Final
-- **Framework:** Next.js 16.2.1 (App Router) com Turbopack.
-- **Backend:** Supabase (PostgreSQL + RLS Policies).
-- **Storage:** Supabase Storage (Buckets: `comprovantes` e `fotos-campanhas`).
-- **Deploy:** Vercel (CI/CD via GitHub).
-- **QR Code:** `qrcode.react` para geração dinâmica de Pix copia-e-cola.
+## 🏗️ Arquitetura Técnica (Full-Stack)
+- **Frontend:** Next.js 16.2.1 (App Router) - Tailwind CSS.
+- **Backend:** Supabase (PostgreSQL + Auth).
+- **Interatividade:** Telegram Bot API com Webhooks dedicados.
+- **Realtime:** Supabase Broadcast (Escuta de mudanças de status sem Refresh).
+- **Persistência:** LocalStorage (Sessão de compra persistente por produto).
+- **Deploy:** Vercel (CI/CD).
 
 ---
 
-## 📂 Esquema de Dados (Finalizado)
-| Tabela | Função |
-| :--- | :--- |
-| **profiles** | Dados do vendedor (Nome, Apto, Condomínio). |
-| **campaigns**| Cabeçalho da oferta (Título, Descrição, Foto, Pix, Expiração). |
-| **products** | Regras do produto (Preço e Variações JSONB dinâmicas). |
-| **orders** | Registros de compra (Dados do vizinho, variações escolhidas, comprovante). |
+## 📂 Estrutura de Dados & Tabelas
+| Tabela | Campos Chave | Relação |
+| :--- | :--- | :--- |
+| **profiles** | id, full_name, apartment, phone | 1:1 com Auth.User |
+| **campaigns**| id, title, image_url, pix_key, creator_id | Pertence a um Profile |
+| **products** | id, price, variations (JSONB), campaign_id | Pertence a uma Campaign |
+| **orders** | id, buyer_name, status, selected_variations (JSONB), receipt_url | Vinculado a Campaign/Product |
 
 ---
 
-## ✅ Funcionalidades de Elite Implementadas
-- [x] **Identificação Inteligente:** Vizinho é reconhecido pelo E-mail/Tel e recupera pedidos em aberto.
-- [x] **Sistema de Variações Genérico:** Vendedor define via texto (ex: `Sabor: Banana, Mel; Tamanho: P, G`) e a LP gera os botões automaticamente.
-- [x] **Upload de Imagens:** Suporte a fotos reais do produto no cabeçalho da oferta.
-- [x] **Fluxo de Pagamento:** QR Code Pix e Chave Copia-e-Cola integrados.
-- [x] **Design Premium:** Header com degradê, cards brancos nítidos e contraste forçado para Light Mode (ignorando preferências de sistema).
+## ✅ Fluxo de Automação Implementado
+1. **Reserva:** Vizinho escolhe variações e quantidade -> Alerta de Texto no Telegram do Vendedor.
+2. **Pagamento:** Vizinho anexa comprovante -> Foto enviada ao Telegram com Botões Inline (Aceitar/Recusar).
+3. **Validação:** Vendedor clica no botão -> API Route (`/api/telegram-webhook`) processa via `SERVICE_ROLE_KEY`.
+4. **Feedback:** O status no banco muda -> LP do vizinho atualiza na hora via Realtime confirmando a entrega.
 
 ---
 
-## 🛠️ Log de Batalhas (Histórico de Correções)
-- **RLS (Row Level Security):** Ajustadas políticas de `INSERT` e `SELECT` para permitir que o público veja fotos e campanhas, mas apenas vendedores criem ofertas.
-- **Build Error (Vercel):** Corrigida a diretiva `'use client'` que possuía erro de sintaxe (`use/client`).
-- **Storage Permissions:** Corrigido erro `42501` (Must be owner) através da criação de políticas específicas para o bucket `fotos-campanhas`.
-- **Visibilidade de Inputs:** Implementado reset de CSS em `globals.css` para evitar campos "invisíveis" causados pelo Dark Mode automático.
+## 🛠️ Log de Batalhas & Soluções (v15.0)
+- **RLS vs Service Role:** Resolvido o erro de permissão ao atualizar status usando a Service Role Key em ambiente de servidor (Edge Function).
+- **Conectividade Webhook:** Identificado e corrigido erro de `404` causado por barra dupla (`//`) na URL de registro do Webhook do Telegram.
+- **Persistência de Sessão:** Implementada lógica de `localStorage` para evitar que o comprador perca o progresso do pedido ao recarregar a página.
+- **Visibilidade Global:** Forçado `color-scheme: light` via CSS para garantir legibilidade de inputs em dispositivos com Dark Mode ativo.
 
 ---
 
-## 🚀 Próximas Evoluções (Backlog)
-- [ ] Notificação automática via WhatsApp para o vendedor no momento da reserva.
-- [ ] Dashboard Financeiro (Soma de vendas confirmadas).
-- [ ] Exportação de lista de entregas do dia em PDF/Texto.
+## 🚀 Próximos Passos (Backlog)
+- [ ] **Dashboard do Vendedor:** Página `/dashboard` para gerenciar lista de entregas e histórico financeiro.
+- [ ] **Multi-vendedores:** Ajustar filtros para que o vendedor veja apenas seus próprios pedidos no Telegram/Painel.
+- [ ] **Relatório de Produção:** Gerar lista consolidada (ex: "Total: 10 Cucas de Banana, 5 de Mel").
 
 ---
 
-## 🔗 Links do Projeto
+## 🔗 Links e Credenciais
+- **Produção:** `https://comprazap.vercel.app`
 - **Repositório:** `https://github.com/yugodeveloper/comprazap`
-- **Produção:** `https://comprazap.vercel.app` (Substituir pela URL real da Vercel)
+- **Bot Telegram:** `@8625189600` (CompraZap Alertas)

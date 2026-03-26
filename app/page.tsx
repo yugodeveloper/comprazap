@@ -1,84 +1,140 @@
 'use client'
+import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function Home() {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+export default function PortalCondominio() {
+  const [phone, setPhone] = useState('')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [myPurchases, setMyPurchases] = useState<any[]>([])
   const [myCampaigns, setMyCampaigns] = useState<any[]>([])
   const router = useRouter()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
-
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (!profileData?.full_name) { router.push('/perfil'); return }
-      setProfile(profileData)
-
-      // Busca as campanhas criadas por você
-      const { data: campaigns } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('creator_id', user.id)
-        .order('created_at', { ascending: false })
-      
-      setMyCampaigns(campaigns || [])
-    }
-    fetchData()
-  }, [router])
-
-  const copyToClipboard = (id: string) => {
-    const url = `${window.location.origin}/c/${id}`
-    navigator.clipboard.writeText(url)
-    alert('Link da campanha copiado! Só colar no WhatsApp. 🚀')
+  // Máscara de Telefone (xx) xxxxx-xxxx
+  const formatPhone = (v: string) => {
+    v = v.replace(/\D/g, "")
+    v = v.replace(/^(\d{2})(\d)/g, "($1) $2")
+    v = v.replace(/(\d{5})(\d)/, "$1-$2")
+    return v.substring(0, 15)
   }
 
-  if (!user || !profile) return <div className="p-10 text-center text-black">Carregando...</div>
+  const handleLogin = async () => {
+    if (phone.length < 14) return alert("Telefone inválido")
+    setLoading(true)
+    
+    // 1. Tenta achar ou criar o perfil
+    let { data: profile } = await supabase.from('profiles').select('*').eq('phone', phone).single()
+    
+    if (!profile) {
+      const { data: newProfile } = await supabase.from('profiles').insert({ phone, full_name: 'Vizinho Novo' }).select().single()
+      profile = newProfile
+    }
 
-  return (
-    <main className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
-      <div className="w-full max-w-md">
-        <div className="bg-white p-6 rounded-2xl shadow-sm mb-6 text-center">
-          <h1 className="text-2xl font-bold text-blue-600">CompraZap ☕</h1>
-          <p className="text-gray-500 text-sm">{profile.full_name} @ {profile.condo_name}</p>
-        </div>
+    localStorage.setItem('user_phone', phone)
+    localStorage.setItem('user_id', profile.id)
+    setIsLoggedIn(true)
+    fetchUserActivity(phone, profile.id)
+  }
 
-        <button 
-          onClick={() => router.push('/campanha/nova')}
-          className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold mb-8 shadow-lg hover:bg-blue-700 transition-all"
-        >
-          + Nova Venda de Produto
-        </button>
+  const fetchUserActivity = async (userPhone: string, userId: string) => {
+    // Buscar compras feitas
+    const { data: purchases } = await supabase
+      .from('orders')
+      .select('*, campaigns(title)')
+      .eq('buyer_contact', userPhone)
+    
+    // Buscar campanhas criadas (vendas)
+    const { data: campaigns } = await supabase
+      .from('campaigns')
+      .select('*')
+      .eq('creator_id', userId)
 
-        <h2 className="font-bold text-gray-700 mb-4">Minhas Campanhas Ativas</h2>
-        <div className="space-y-4">
-          {myCampaigns.length === 0 && <p className="text-gray-400 text-center italic">Nenhuma campanha criada ainda.</p>}
-          {myCampaigns.map((c) => (
-            <div key={c.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <h3 className="font-bold text-black">{c.title}</h3>
-              <p className="text-xs text-gray-400 mb-4">Local: {c.location}</p>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => copyToClipboard(c.id)}
-                  className="flex-1 bg-green-50 text-green-700 py-2 rounded-lg text-sm font-bold border border-green-200"
-                >
-                  Copiar Link Zap
-                </button>
-                <button 
-                  onClick={() => router.push(`/campanha/gestao/${c.id}`)}
-                  className="flex-1 bg-gray-50 text-gray-700 py-2 rounded-lg text-sm font-bold border border-gray-200"
-                >
-                  Ver Pedidos
-                </button>
-              </div>
-            </div>
-          ))}
+    setMyPurchases(purchases || [])
+    setMyCampaigns(campaigns || [])
+    setLoading(false)
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-slate-900">
+        <h1 className="text-5xl font-black italic tracking-tighter mb-2">CompraZap⚡</h1>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em] mb-12">Portal do Morador • Lanai</p>
+        
+        <div className="w-full max-w-sm space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">WhatsApp para entrar</label>
+            <input 
+              type="tel" placeholder="(00) 00000-0000"
+              className="w-full p-6 bg-slate-50 rounded-[30px] text-2xl font-black outline-none border-2 border-transparent focus:border-slate-900 transition-all"
+              value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}
+            />
+          </div>
+          <button 
+            onClick={handleLogin}
+            className="w-full bg-slate-900 text-white py-6 rounded-[30px] font-black text-xl shadow-2xl active:scale-95 transition-all"
+          >
+            {loading ? 'CARREGANDO...' : 'ENTRAR'}
+          </button>
         </div>
       </div>
-    </main>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
+      <div className="max-w-md mx-auto space-y-10">
+        
+        <header className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-black italic">Olá, Vizinho!</h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{phone}</p>
+          </div>
+          <button onClick={() => { localStorage.clear(); setIsLoggedIn(false); }} className="text-[10px] font-black text-red-500 uppercase border-b-2 border-red-100">Sair</button>
+        </header>
+
+        {/* SEÇÃO DE COMPRAS */}
+        <section className="space-y-4">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+            🛒 Minhas Compras
+          </h3>
+          {myPurchases.length === 0 ? (
+            <div className="p-8 bg-white rounded-[32px] text-center text-slate-300 text-xs font-bold border-2 border-dashed">Nenhuma compra ainda</div>
+          ) : (
+            myPurchases.map(order => (
+              <div key={order.id} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 flex justify-between items-center">
+                <div>
+                  <p className="font-black text-slate-800">{order.campaigns?.title}</p>
+                  <p className={`text-[10px] font-black uppercase ${order.status === 'paid' ? 'text-green-500' : 'text-orange-500'}`}>
+                    {order.status === 'paid' ? '✅ Pago' : '⏳ Pendente'}
+                  </p>
+                </div>
+                <button onClick={() => router.push(`/c/${order.campaign_id}`)} className="p-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase">Ver</button>
+              </div>
+            ))
+          )}
+        </section>
+
+        {/* SEÇÃO DE VENDAS */}
+        <section className="space-y-4">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+            💰 Minhas Vendas
+          </h3>
+          <button onClick={() => router.push('/nova-campanha')} className="w-full p-6 bg-blue-600 text-white rounded-[24px] font-black text-sm shadow-lg shadow-blue-100 mb-4 uppercase">
+            + Lançar Nova Oferta
+          </button>
+          
+          {myCampaigns.map(camp => (
+            <div key={camp.id} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100">
+               <div className="flex justify-between items-center">
+                  <p className="font-black text-slate-800">{camp.title}</p>
+                  <button onClick={() => router.push(`/dashboard/${camp.id}`)} className="text-[10px] font-black text-blue-600 uppercase">Gerenciar Pedidos</button>
+               </div>
+            </div>
+          ))}
+        </section>
+
+      </div>
+    </div>
   )
 }
