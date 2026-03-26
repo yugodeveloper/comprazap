@@ -1,12 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Atenção: Use a Service Role Key aqui!
-)
+// Adicionamos valores padrão vazios para não quebrar o build se a variável sumir
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function POST(req: Request) {
+  // Verificação de segurança extra
+  if (!supabaseServiceKey) {
+    console.error("SERVICE ROLE KEY faltando!");
+    return NextResponse.json({ error: "Configuração incompleta" }, { status: 500 });
+  }
+
   const body = await req.json()
 
   // Verifica se é um clique em botão (callback_query)
