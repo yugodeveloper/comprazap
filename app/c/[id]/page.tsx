@@ -29,7 +29,27 @@ export default function LandingPageGourmetFinal() {
   const [uploading, setUploading] = useState(false)
   const [currentReceipt, setCurrentReceipt] = useState<string | null>(null)
 
-  // --- 1. CARREGAMENTO INICIAL ---
+  // --- 1. MEMÓRIA DE SESSÃO (LOCALSTORAGE) ---
+  useEffect(() => {
+    if (!id) return;
+    const savedOrderId = localStorage.getItem(`order_${id}`);
+    if (savedOrderId) {
+      setOrderId(savedOrderId);
+      setStep('checkout');
+      // Tenta recuperar se já havia um comprovante enviado
+      const checkOrder = async () => {
+        const { data } = await supabase.from('orders').select('status, receipt_url, buyer_name').eq('id', savedOrderId).single();
+        if (data) {
+          if (data.status === 'paid') setCurrentReceipt('confirmed');
+          else if (data.receipt_url) setCurrentReceipt(data.receipt_url);
+          if (data.buyer_name) setBuyerName(data.buyer_name);
+        }
+      };
+      checkOrder();
+    }
+  }, [id]);
+
+  // --- 2. CARREGAMENTO DOS DADOS DA CAMPANHA ---
   useEffect(() => {
     if (!id) return
     const fetchData = async () => {
@@ -60,12 +80,12 @@ export default function LandingPageGourmetFinal() {
     fetchData()
   }, [id])
 
-  // --- 2. ESCUTA EM TEMPO REAL (REALTIME) ---
+  // --- 3. ESCUTA EM TEMPO REAL (REALTIME) ---
   useEffect(() => {
     if (!orderId) return;
 
     const subscription = supabase
-      .channel('status-order')
+      .channel(`status-order-${orderId}`)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -78,7 +98,7 @@ export default function LandingPageGourmetFinal() {
           setCurrentReceipt('confirmed');
         } else if (payload.new.status === 'rejected') {
           alert("⚠️ Comprovante inválido. Por favor, envie novamente.");
-          setCurrentReceipt(null); // Reseta para permitir novo upload
+          setCurrentReceipt(null); 
         }
       })
       .subscribe();
@@ -86,11 +106,10 @@ export default function LandingPageGourmetFinal() {
     return () => { supabase.removeChannel(subscription) };
   }, [orderId]);
 
-  // --- 3. FUNÇÕES DE NOTIFICAÇÃO TELEGRAM ---
+  // --- 4. FUNÇÕES DE NOTIFICAÇÃO TELEGRAM ---
   const enviarNotificacaoTelegram = async (order: any) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-
     if (!token || !chatId) return;
 
     const mensagem = `
@@ -139,7 +158,7 @@ export default function LandingPageGourmetFinal() {
     });
   };
 
-  // --- 4. HANDLERS (AÇÕES) ---
+  // --- 5. HANDLERS (AÇÕES) ---
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -161,6 +180,7 @@ export default function LandingPageGourmetFinal() {
       if (error) throw error
       if (data) {
         setOrderId(data.id)
+        localStorage.setItem(`order_${id}`, data.id); 
         setStep('checkout')
         enviarNotificacaoTelegram(data);
       }
@@ -181,11 +201,9 @@ export default function LandingPageGourmetFinal() {
     
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
-      await supabase.from('orders').update({ receipt_url: publicUrl }).eq('id', orderId)
+      await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', orderId)
       
-      // Enviando o orderId como 3º argumento
       await enviarComprovanteTelegram(publicUrl, buyerName, orderId);
-      
       setCurrentReceipt(publicUrl)
     }
     setUploading(false)
@@ -309,23 +327,32 @@ export default function LandingPageGourmetFinal() {
 
               <div className="rounded-3xl bg-white p-6 border-2 border-dashed border-slate-200">
                 <p className="mb-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Enviar Comprovante</p>
-                <input 
-                  type="file" accept="image/*" onChange={handleFileUpload}
-                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-900 file:text-white file:font-bold cursor-pointer" 
-                />
                 
-                {currentReceipt && currentReceipt === 'confirmed' ? (
-                   <div className="mt-4 p-4 bg-green-100 rounded-xl text-green-700 text-sm font-bold flex items-center justify-center gap-2">
-                   🚀 Pagamento Confirmado! Prepare-se para receber.
-                 </div>
-                ) : currentReceipt && (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm font-bold flex items-center justify-center gap-2">
-                    ✅ Comprovante em análise...
-                  </div>
+                {currentReceipt === 'confirmed' ? (
+                   <div className="mt-4 p-8 bg-green-50 rounded-[32px] border-2 border-green-200 animate-bounce">
+                     <p className="text-4xl mb-2">🚀</p>
+                     <p className="text-green-800 font-black text-lg">PAGAMENTO CONFIRMADO!</p>
+                     <p className="text-green-600 text-sm font-bold">O vendedor já está preparando seu pedido.</p>
+                   </div>
+                ) : (
+                  <>
+                    <input 
+                      type="file" accept="image/*" onChange={handleFileUpload}
+                      className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-900 file:text-white file:font-bold cursor-pointer" 
+                    />
+                    
+                    {currentReceipt ? (
+                      <div className="mt-4 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm font-bold border border-blue-100 flex items-center justify-center gap-2">
+                        ⏳ Comprovante em análise...
+                      </div>
+                    ) : (
+                      <p className="mt-4 text-[10px] text-slate-400 font-bold uppercase tracking-tight">Anexe o print para validar sua reserva</p>
+                    )}
+                  </>
                 )}
                 
                 {uploading && (
-                  <p className="mt-4 animate-pulse text-xs text-blue-600 font-black uppercase">Enviando Arquivo...</p>
+                  <p className="mt-4 animate-pulse text-xs text-blue-600 font-black uppercase tracking-widest">Enviando Arquivo...</p>
                 )}
               </div>
             </div>
