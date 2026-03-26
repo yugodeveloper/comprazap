@@ -20,6 +20,26 @@ export default function PortalCondominio() {
   const [myCampaigns, setMyCampaigns] = useState<any[]>([])
   const router = useRouter()
 
+  // --- PERSISTÊNCIA DE LOGIN AO CARREGAR PÁGINA ---
+  useEffect(() => {
+    const savedPhone = localStorage.getItem('user_phone');
+    const savedId = localStorage.getItem('user_id');
+    if (savedPhone && savedId) {
+      setPhone(savedPhone);
+      setLoading(true);
+      supabase.from('profiles').select('*').eq('id', savedId).single().then(({ data }) => {
+        if (data) {
+          setSavedProfile(data);
+          setIsLoggedIn(true);
+          fetchUserActivity(savedPhone, savedId);
+        } else {
+          localStorage.clear();
+        }
+        setLoading(false);
+      });
+    }
+  }, []);
+
   const formatPhone = (v: string) => {
     v = v.replace(/\D/g, "")
     v = v.replace(/^(\d{2})(\d)/g, "($1) $2")
@@ -52,9 +72,8 @@ export default function PortalCondominio() {
           alert("Senha incorreta!");
         }
       } else {
-        // CADASTRO OU EDIÇÃO (UPSERT)
         const { data: profile, error } = await supabase.from('profiles').upsert({ 
-          id: savedProfile?.id, // Se tiver ID, ele atualiza (Edição)
+          id: savedProfile?.id, 
           phone, 
           full_name: formData.full_name,
           email: formData.email,
@@ -78,6 +97,16 @@ export default function PortalCondominio() {
     fetchUserActivity(profile.phone, profile.id);
   }
 
+  const handleLogout = () => {
+    localStorage.clear();
+    setIsLoggedIn(false);
+    setView('phone');
+    setPhone('');
+    setSavedProfile(null);
+    setMyPurchases([]);
+    setMyCampaigns([]);
+  };
+
   const fetchUserActivity = async (userPhone: string, userId: string) => {
     const { data: purchases } = await supabase.from('orders').select('*, campaigns(title)').eq('buyer_contact', userPhone);
     const { data: campaigns } = await supabase.from('campaigns').select('*').eq('creator_id', userId);
@@ -86,7 +115,6 @@ export default function PortalCondominio() {
     setLoading(false)
   }
 
-  // Preenche o formulário ao clicar em "Editar Perfil"
   const startEdit = () => {
     setFormData({
       full_name: savedProfile.full_name,
@@ -95,20 +123,72 @@ export default function PortalCondominio() {
       password: savedProfile.password
     });
     setView('signup');
-    setIsLoggedIn(false); // Volta para a tela de formulário
+    setIsLoggedIn(false);
   }
 
+  // --- TELAS DE LOGIN / CADASTRO ---
   if (!isLoggedIn) {
-    // [O código das telas de Login/Signup permanece igual ao anterior, 
-    // apenas garantindo que o handleAuthAction acima suporte o Upsert]
-    // ... (mesmo retorno de login/signup do passo anterior) ...
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-slate-900">
+        <h1 className="text-5xl font-black italic tracking-tighter mb-2">CompraZap⚡</h1>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em] mb-12">Portal do Morador • Lanai</p>
+        
+        <div className="w-full max-w-sm space-y-6">
+          {view === 'phone' && (
+            <div className="space-y-4 animate-in fade-in duration-500">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">WhatsApp para entrar</label>
+              <input 
+                type="tel" placeholder="(00) 00000-0000"
+                className="w-full p-6 bg-slate-50 rounded-[30px] text-2xl font-black outline-none border-2 border-transparent focus:border-slate-900 transition-all"
+                value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}
+              />
+              <button onClick={handleCheckPhone} className="w-full bg-slate-900 text-white py-6 rounded-[30px] font-black text-xl shadow-2xl active:scale-95 transition-all">
+                {loading ? 'CARREGANDO...' : 'ENTRAR'}
+              </button>
+            </div>
+          )}
+
+          {view === 'login' && (
+            <form onSubmit={handleAuthAction} className="space-y-4 animate-in zoom-in duration-300">
+              <div className="text-center">
+                <h2 className="font-black text-xl italic">Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Sua senha para entrar:</p>
+              </div>
+              <input 
+                type="password" placeholder="Senha" required
+                className="w-full p-6 bg-slate-50 rounded-[30px] text-center text-2xl font-black outline-none border-2 border-transparent focus:border-slate-900"
+                value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+              />
+              <button type="submit" className="w-full bg-slate-900 text-white py-6 rounded-[30px] font-black text-xl shadow-2xl uppercase">
+                {loading ? 'AUTENTICANDO...' : 'CONFIRMAR'}
+              </button>
+              <button type="button" onClick={() => setView('phone')} className="w-full text-[10px] font-black text-slate-400 uppercase">Trocar número</button>
+            </form>
+          )}
+
+          {view === 'signup' && (
+            <form onSubmit={handleAuthAction} className="space-y-3 animate-in slide-in-from-bottom-4 duration-500">
+              <h2 className="font-black text-xl text-center italic">{savedProfile?.id ? 'Editar Perfil' : 'Criar Cadastro'}</h2>
+              <input type="text" placeholder="Nome Completo" required className="w-full p-4 bg-slate-50 rounded-2xl font-bold border border-slate-100" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
+              <input type="email" placeholder="E-mail" required className="w-full p-4 bg-slate-50 rounded-2xl font-bold border border-slate-100" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              <input type="text" placeholder="Unidade (ex: Apto 402)" required className="w-full p-4 bg-slate-50 rounded-2xl font-bold border border-slate-100" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
+              <input type="password" placeholder="Sua Senha" required className="w-full p-4 bg-slate-50 rounded-2xl font-bold border border-slate-100" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-[30px] font-black text-lg shadow-xl uppercase">
+                {loading ? 'SALVANDO...' : 'SALVAR DADOS'}
+              </button>
+              <button type="button" onClick={() => setIsLoggedIn(true)} className="w-full text-[10px] font-black text-slate-400 uppercase">Cancelar</button>
+            </form>
+          )}
+        </div>
+      </div>
+    )
   }
 
+  // --- PORTAL (LOGADO) ---
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       <div className="max-w-md mx-auto space-y-10">
         
-        {/* HEADER ATUALIZADO (ITEM 1) */}
         <header className="flex justify-between items-start bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
           <div>
             <h2 className="text-2xl font-black italic text-slate-900 leading-tight">
@@ -125,14 +205,13 @@ export default function PortalCondominio() {
             </button>
           </div>
           <button 
-            onClick={() => { localStorage.clear(); setIsLoggedIn(false); setView('phone'); }} 
+            onClick={handleLogout} 
             className="text-[10px] font-black text-red-500 uppercase bg-red-50 px-4 py-2 rounded-full active:scale-90 transition-all"
           >
             Sair
           </button>
         </header>
 
-        {/* SEÇÃO DE COMPRAS */}
         <section className="space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">🛒 Minhas Compras</h3>
           {myPurchases.length === 0 ? (
@@ -152,11 +231,8 @@ export default function PortalCondominio() {
           )}
         </section>
 
-        {/* SEÇÃO DE VENDAS */}
         <section className="space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">💰 Minhas Vendas</h3>
-          
-          {/* CORREÇÃO DO LINK (ITEM 2) */}
           <button 
             onClick={() => router.push('/campanha/nova')} 
             className="w-full p-6 bg-blue-600 text-white rounded-[30px] font-black text-sm shadow-xl shadow-blue-100 mb-4 uppercase hover:bg-blue-700 active:scale-95 transition-all"
@@ -171,7 +247,7 @@ export default function PortalCondominio() {
               <div key={camp.id} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 flex justify-between items-center">
                   <p className="font-black text-slate-800">{camp.title}</p>
                   <button 
-                    onClick={() => router.push('/gestao')} // Ajustado para a página de gestão que já temos
+                    onClick={() => router.push('/gestao')} 
                     className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-2 rounded-lg"
                   >
                     Gerenciar
@@ -180,7 +256,6 @@ export default function PortalCondominio() {
             ))
           )}
         </section>
-
       </div>
     </div>
   )

@@ -1,127 +1,130 @@
 'use client'
-import { supabase } from '../../lib/supabase' 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function NovaCampanha() {
   const [title, setTitle] = useState('')
-  const [desc, setDesc] = useState('')
+  const [description, setDescription] = useState('')
+  const [pixKey, setPixKey] = useState('')
   const [price, setPrice] = useState('')
-  const [pix, setPix] = useState('')
-  const [expires, setExpires] = useState('')
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [variationsInput, setVariationsInput] = useState('') // Ex: "Tamanho: P, M; Sabor: Banana"
   const [loading, setLoading] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const router = useRouter()
 
-  const parseVariations = (input: string) => {
-    if (!input) return {};
-    const variations: any = {};
-    const parts = input.split(';');
-    parts.forEach(part => {
-      const [key, valuesText] = part.split(':');
-      if (key && valuesText) {
-        variations[key.trim()] = valuesText.split(',').map(v => v.trim());
-      }
-    });
-    return variations;
-  }
+  // --- VERIFICA SE O USUÁRIO ESTÁ LOGADO VIA LOCALSTORAGE ---
+  useEffect(() => {
+    const savedId = localStorage.getItem('user_id')
+    if (!savedId) {
+      alert("Sessão expirada. Por favor, entre novamente.")
+      router.push('/')
+      return
+    }
+    setUserId(savedId)
+  }, [router])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!userId) return
+
     setLoading(true)
-
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Faça login novamente.')
+      // 1. Criar a Campanha vinculada ao creator_id (nosso user_id manual)
+      const { data: campaign, error: cpError } = await supabase
+        .from('campaigns')
+        .insert({
+          title,
+          description,
+          pix_key: pixKey,
+          creator_id: userId,
+          status: 'active'
+        })
+        .select()
+        .single()
 
-      let imageUrl = ''
-      if (imageFile) {
-        // Limpa o nome do arquivo para evitar erros de URL
-        const fileExt = imageFile.name.split('.').pop()
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      if (cpError) throw cpError
 
-        const { error: upErr } = await supabase.storage
-          .from('fotos-campanhas') 
-          .upload(fileName, imageFile)
+      // 2. Criar o Produto padrão para esta campanha
+      const { error: pdError } = await supabase
+        .from('products')
+        .insert({
+          campaign_id: campaign.id,
+          price: parseFloat(price.replace(',', '.')), // Garante formato decimal
+          variations: { "Opção": ["Padrão"] }
+        })
 
-        if (upErr) throw upErr
+      if (pdError) throw pdError
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('fotos-campanhas')
-          .getPublicUrl(fileName)
-        
-        imageUrl = publicUrl
-      }
-
-      // 1. Criar Campanha
-      const { data: cp, error: cpErr } = await supabase.from('campaigns').insert({
-        title, description: desc, pix_key: pix, 
-        creator_id: user.id, image_url: imageUrl,
-        expires_at: expires ? new Date(expires).toISOString() : null,
-        location: 'Lanai - Retirar com Vendedor',
-        status: 'active'
-      }).select().single()
-
-      if (cpErr) throw cpErr
-
-      // 2. Criar Produto com as variações digitadas
-      const variationsJson = parseVariations(variationsInput);
-      await supabase.from('products').insert({
-        campaign_id: cp.id,
-        name: title,
-        price: parseFloat(price),
-        variations: variationsJson
-      })
-
+      alert("🚀 Oferta lançada com sucesso!")
       router.push('/')
     } catch (err: any) {
-      alert('Erro: ' + err.message)
+      console.error(err)
+      alert("Erro ao criar oferta: " + err.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 flex flex-col items-center font-sans">
-      <div className="w-full max-w-md bg-white p-8 rounded-[32px] shadow-xl border border-slate-100">
-        <h1 className="text-2xl font-black text-slate-900 mb-6">Lançar Oferta 🎉</h1>
+    <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center font-sans text-slate-900">
+      <div className="w-full max-w-md bg-white rounded-[40px] p-8 shadow-2xl border border-slate-100">
         
+        <header className="mb-8">
+          <button onClick={() => router.push('/')} className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">← Voltar</button>
+          <h1 className="text-3xl font-black italic tracking-tighter">Lançar Oferta ⚡</h1>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">O condomínio vai amar isso.</p>
+        </header>
+
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Foto do Produto</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Título da Oferta</label>
             <input 
-              type="file" accept="image/*" 
-              onChange={e => setImageFile(e.target.files?.[0] || null)} 
-              className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" 
+              placeholder="Ex: Cuca de Banana Artesanal" 
+              required 
+              className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+              value={title} onChange={e => setTitle(e.target.value)} 
             />
-          </div>
-
-          <input placeholder="Título (ex: Cuca de Banana)" required className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-blue-500 font-medium text-slate-900" value={title} onChange={e => setTitle(e.target.value)} />
-          
-          <textarea placeholder="Descrição curta..." className="w-full p-4 bg-slate-50 rounded-2xl h-24 text-slate-900" value={desc} onChange={e => setDesc(e.target.value)} />
-
-          <div className="grid grid-cols-2 gap-3">
-            <input placeholder="Preço R$" type="number" step="0.01" required className="p-4 bg-slate-50 rounded-2xl text-slate-900" value={price} onChange={e => setPrice(e.target.value)} />
-            <input type="date" className="p-4 bg-slate-50 rounded-2xl text-xs text-slate-500" value={expires} onChange={e => setExpires(e.target.value)} />
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Variações (Separe por ; e ,)</label>
-            <input 
-              placeholder="Ex: Sabor: Banana, Mel; Tamanho: P, G" 
-              className="w-full p-4 bg-slate-50 rounded-2xl text-xs text-slate-900 border border-slate-100" 
-              value={variationsInput} onChange={e => setVariationsInput(e.target.value)} 
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descrição Curta</label>
+            <textarea 
+              placeholder="Conte detalhes do produto..." 
+              className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all h-24 resize-none"
+              value={description} onChange={e => setDescription(e.target.value)} 
             />
           </div>
 
-          <input placeholder="Chave Pix" required className="w-full p-4 bg-slate-50 rounded-2xl font-mono text-blue-600 border border-slate-100" value={pix} onChange={e => setPix(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Preço (R$)</label>
+              <input 
+                type="text" placeholder="25,00" required 
+                className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+                value={price} onChange={e => setPrice(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Chave PIX</label>
+              <input 
+                placeholder="CPF, e-mail ou Cel" required 
+                className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+                value={pixKey} onChange={e => setPixKey(e.target.value)} 
+              />
+            </div>
+          </div>
 
-          <button disabled={loading} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all">
-            {loading ? 'PUBLICANDO...' : 'LANÇAR AGORA'}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-slate-900 text-white py-6 rounded-[30px] font-black text-xl shadow-2xl active:scale-95 transition-all mt-4 disabled:bg-slate-300"
+          >
+            {loading ? 'PUBLICANDO...' : 'LANÇAR NO CONDOMÍNIO'}
           </button>
         </form>
       </div>
+      
+      <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">CompraZap ⚡ Lanai</p>
     </div>
   )
 }
