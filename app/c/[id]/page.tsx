@@ -60,8 +60,13 @@ export default function LandingPageGourmetFinal() {
     fetchData()
   }, [id])
 const enviarNotificacaoTelegram = async (order: any) => {
-  const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN; // Usamos NEXT_PUBLIC para teste rápido
+const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
   const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId) {
+    console.error("Erro: Variáveis do Telegram não configuradas.");
+    return;
+  }
 
   const mensagem = `
 💰 *NOVO PEDIDO NO COMPRAZAP!*
