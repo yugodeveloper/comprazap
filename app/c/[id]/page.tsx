@@ -95,6 +95,27 @@ const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     console.error("Erro ao avisar Telegram:", err);
   }
 };
+
+const enviarComprovanteTelegram = async (imageUrl: string, buyer: string) => {
+  const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: imageUrl,
+        caption: `✅ *PAGAMENTO RECEBIDO!*\n👤 Cliente: ${buyer}\n🖼️ Comprovante acima.`,
+        parse_mode: 'Markdown'
+      })
+    });
+  } catch (err) {
+    console.error("Erro ao enviar foto para Telegram:", err);
+  }
+};
+
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -141,6 +162,7 @@ const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
       await supabase.from('orders').update({ receipt_url: publicUrl }).eq('id', orderId)
+      await enviarComprovanteTelegram(publicUrl, buyerName);
       setCurrentReceipt(publicUrl)
     }
     setUploading(false)
