@@ -20,7 +20,6 @@ export default function PortalCondominio() {
   const [myCampaigns, setMyCampaigns] = useState<any[]>([])
   const router = useRouter()
 
-  // --- PERSISTÊNCIA DE LOGIN AO CARREGAR PÁGINA ---
   useEffect(() => {
     const savedPhone = localStorage.getItem('user_phone');
     const savedId = localStorage.getItem('user_id');
@@ -109,7 +108,7 @@ export default function PortalCondominio() {
 
   const fetchUserActivity = async (userPhone: string, userId: string) => {
     const { data: purchases } = await supabase.from('orders').select('*, campaigns(title)').eq('buyer_contact', userPhone);
-    const { data: campaigns } = await supabase.from('campaigns').select('*').eq('creator_id', userId);
+    const { data: campaigns } = await supabase.from('campaigns').select('*').eq('creator_id', userId).order('expires_at', { ascending: false });
     setMyPurchases(purchases || [])
     setMyCampaigns(campaigns || [])
     setLoading(false)
@@ -126,13 +125,11 @@ export default function PortalCondominio() {
     setIsLoggedIn(false);
   }
 
-  // --- TELAS DE LOGIN / CADASTRO ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-slate-900">
         <h1 className="text-5xl font-black italic tracking-tighter mb-2">CompraZap⚡</h1>
         <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em] mb-12">Portal do Morador • Lanai</p>
-        
         <div className="w-full max-w-sm space-y-6">
           {view === 'phone' && (
             <div className="space-y-4 animate-in fade-in duration-500">
@@ -147,7 +144,6 @@ export default function PortalCondominio() {
               </button>
             </div>
           )}
-
           {view === 'login' && (
             <form onSubmit={handleAuthAction} className="space-y-4 animate-in zoom-in duration-300">
               <div className="text-center">
@@ -165,7 +161,6 @@ export default function PortalCondominio() {
               <button type="button" onClick={() => setView('phone')} className="w-full text-[10px] font-black text-slate-400 uppercase">Trocar número</button>
             </form>
           )}
-
           {view === 'signup' && (
             <form onSubmit={handleAuthAction} className="space-y-3 animate-in slide-in-from-bottom-4 duration-500">
               <h2 className="font-black text-xl text-center italic">{savedProfile?.id ? 'Editar Perfil' : 'Criar Cadastro'}</h2>
@@ -184,27 +179,26 @@ export default function PortalCondominio() {
     )
   }
 
-  // --- PORTAL (LOGADO) ---
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       <div className="max-w-md mx-auto space-y-10">
         
-        <header className="flex justify-between items-start bg-white/80 backdrop-blur-md sticky top-0 z-50 p-6 rounded-b-[32px] shadow-sm">
-  <div>
-    <h2 className="text-2xl font-black italic text-slate-900">
-      Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!
-    </h2>
-    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-      {savedProfile?.unit || 'Sem Unidade'} • {phone}
-    </p>
-    <button onClick={startEdit} className="text-[10px] font-black text-blue-600 uppercase mt-1 border-b border-blue-100">
-      Editar Perfil
-    </button>
-  </div>
-  <button onClick={handleLogout} className="text-[10px] font-black text-red-500 uppercase bg-red-50 px-4 py-2 rounded-full">
-    Sair
-  </button>
-</header>
+        <header className="flex justify-between items-start bg-white/80 backdrop-blur-md sticky top-0 z-50 p-6 rounded-b-[32px] shadow-sm border border-slate-100">
+          <div>
+            <h2 className="text-2xl font-black italic text-slate-900 leading-tight">
+              Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!
+            </h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+              {savedProfile?.unit || 'Sem Unidade'} • {phone}
+            </p>
+            <button onClick={startEdit} className="text-[10px] font-black text-blue-600 uppercase mt-2 border-b border-blue-100">
+              Editar Perfil
+            </button>
+          </div>
+          <button onClick={handleLogout} className="text-[10px] font-black text-red-500 uppercase bg-red-50 px-4 py-2 rounded-full active:scale-90 transition-all">
+            Sair
+          </button>
+        </header>
 
         <section className="space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">🛒 Minhas Compras</h3>
@@ -231,23 +225,32 @@ export default function PortalCondominio() {
             onClick={() => router.push('/campanha/nova')} 
             className="w-full p-6 bg-blue-600 text-white rounded-[30px] font-black text-sm shadow-xl shadow-blue-100 mb-4 uppercase hover:bg-blue-700 active:scale-95 transition-all"
           >
-            + Lançar Nova Oferta
+            + Lançar Nova Campanha
           </button>
           
           {myCampaigns.length === 0 ? (
             <div className="p-8 bg-white rounded-[32px] text-center text-slate-300 text-xs font-bold border-2 border-dashed">Você ainda não vende nada</div>
           ) : (
-            myCampaigns.map(camp => (
-              <div key={camp.id} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 flex justify-between items-center">
-                  <p className="font-black text-slate-800">{camp.title}</p>
+            myCampaigns.map(camp => {
+              const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
+              
+              return (
+                <div key={camp.id} className={`bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 flex justify-between items-center ${isExpired ? 'opacity-60 bg-slate-50' : ''}`}>
+                  <div>
+                    <p className="font-black text-slate-800">{camp.title}</p>
+                    <p className={`text-[9px] font-black uppercase tracking-tighter ${isExpired ? 'text-red-500' : 'text-slate-400'}`}>
+                      {isExpired ? '❌ ENCERRADA' : `⏳ Expira: ${new Date(camp.expires_at).toLocaleDateString('pt-BR')}`}
+                    </p>
+                  </div>
                   <button 
-                    onClick={() => router.push('/gestao')} 
-                    className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-2 rounded-lg"
+                    onClick={() => router.push(`/campanha/gestao/${camp.id}`)} 
+                    className={`text-[10px] font-black uppercase px-3 py-2 rounded-lg ${isExpired ? 'text-slate-400 bg-slate-200' : 'text-blue-600 bg-blue-50'}`}
                   >
                     Gerenciar
                   </button>
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </section>
       </div>

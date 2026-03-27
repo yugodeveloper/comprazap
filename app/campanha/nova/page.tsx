@@ -8,6 +8,7 @@ export default function NovaCampanha() {
   const [description, setDescription] = useState('')
   const [pixKey, setPixKey] = useState('')
   const [price, setPrice] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -36,7 +37,7 @@ export default function NovaCampanha() {
       const filePath = `campaign-images/${fileName}`
 
       const { error: uploadError } = await supabase.storage
-        .from('comprovantes') // Usando o bucket que já temos permissão
+        .from('comprovantes') 
         .upload(filePath, file)
 
       if (uploadError) throw uploadError
@@ -66,8 +67,10 @@ export default function NovaCampanha() {
           title,
           description,
           pix_key: pixKey,
-          image_url: imageUrl, // Imagem restaurada aqui!
+          image_url: imageUrl,
+          expires_at: expiresAt, // Campo de validade
           creator_id: userId,
+          location: 'Lanai', // Garante que não dê erro de null constraint
           status: 'active'
         })
         .select()
@@ -80,17 +83,17 @@ export default function NovaCampanha() {
         .from('products')
         .insert({
           campaign_id: campaign.id,
-          name: title,
+          name: title, // Usando o título da campanha como nome do produto
           price: parseFloat(price.replace(',', '.')),
           variations: { "Opção": ["Padrão"] }
         })
 
       if (pdError) throw pdError
 
-      alert("🚀 Oferta lançada com sucesso!")
+      alert("🚀 Campanha lançada com sucesso!")
       router.push('/')
     } catch (err: any) {
-      alert("Erro ao criar oferta: " + err.message)
+      alert("Erro ao criar campanha: " + err.message)
     } finally {
       setLoading(false)
     }
@@ -102,12 +105,12 @@ export default function NovaCampanha() {
         
         <header className="mb-6">
           <button onClick={() => router.push('/')} className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">← Voltar</button>
-          <h1 className="text-3xl font-black italic tracking-tighter">Lançar Oferta ⚡</h1>
+          <h1 className="text-3xl font-black italic tracking-tighter">Lançar Campanha ⚡</h1>
         </header>
 
         <form onSubmit={handleCreate} className="space-y-4">
           
-          {/* ÁREA DE FOTO (RESTAURADA) */}
+          {/* FOTO */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Foto do Produto</label>
             <div className="relative h-40 w-full bg-slate-100 rounded-3xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
@@ -132,10 +135,10 @@ export default function NovaCampanha() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Título</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Título da Campanha</label>
             <input 
               placeholder="Ex: Cuca de Banana" required 
-              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none"
+              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
               value={title} onChange={e => setTitle(e.target.value)} 
             />
           </div>
@@ -143,29 +146,38 @@ export default function NovaCampanha() {
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descrição</label>
             <textarea 
-              placeholder="Detalhes..." 
-              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none h-20"
+              placeholder="Detalhes sobre o produto, entrega ou encomendas..." 
+              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none h-20 resize-none border-2 border-transparent focus:border-slate-900 transition-all"
               value={description} onChange={e => setDescription(e.target.value)} 
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Preço (R$)</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Preço Unitário (R$)</label>
               <input 
                 type="text" placeholder="25,00" required 
-                className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none"
+                className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
                 value={price} onChange={e => setPrice(e.target.value)} 
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Chave PIX</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Expira em</label>
               <input 
-                placeholder="PIX" required 
-                className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none"
-                value={pixKey} onChange={e => setPixKey(e.target.value)} 
+                type="date" required 
+                className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
+                value={expiresAt} onChange={e => setExpiresAt(e.target.value)} 
               />
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Chave PIX para Recebimento</label>
+            <input 
+              placeholder="CPF, E-mail ou Celular" required 
+              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
+              value={pixKey} onChange={e => setPixKey(e.target.value)} 
+            />
           </div>
 
           <button 
@@ -176,6 +188,7 @@ export default function NovaCampanha() {
           </button>
         </form>
       </div>
+      <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">CompraZap⚡ Lanai</p>
     </div>
   )
 }
