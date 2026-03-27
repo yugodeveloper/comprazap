@@ -80,6 +80,7 @@ export default function NovaCampanha() {
         .from('products')
         .insert({
           campaign_id: campaign.id,
+          name: title,
           price: parseFloat(price.replace(',', '.')),
           variations: { "Opção": ["Padrão"] }
         })
