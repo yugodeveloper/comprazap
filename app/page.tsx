@@ -189,28 +189,22 @@ export default function PortalCondominio() {
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       <div className="max-w-md mx-auto space-y-10">
         
-        <header className="flex justify-between items-start bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
-          <div>
-            <h2 className="text-2xl font-black italic text-slate-900 leading-tight">
-              Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!
-            </h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-              {phone} • {savedProfile?.unit || 'Unidade não informada'}
-            </p>
-            <button 
-              onClick={startEdit}
-              className="text-[10px] font-black text-blue-600 uppercase border-b border-blue-100 mt-2"
-            >
-              Editar Dados / Senha
-            </button>
-          </div>
-          <button 
-            onClick={handleLogout} 
-            className="text-[10px] font-black text-red-500 uppercase bg-red-50 px-4 py-2 rounded-full active:scale-90 transition-all"
-          >
-            Sair
-          </button>
-        </header>
+        <header className="flex justify-between items-start bg-white/80 backdrop-blur-md sticky top-0 z-50 p-6 rounded-b-[32px] shadow-sm">
+  <div>
+    <h2 className="text-2xl font-black italic text-slate-900">
+      Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!
+    </h2>
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+      {savedProfile?.unit || 'Sem Unidade'} • {phone}
+    </p>
+    <button onClick={startEdit} className="text-[10px] font-black text-blue-600 uppercase mt-1 border-b border-blue-100">
+      Editar Perfil
+    </button>
+  </div>
+  <button onClick={handleLogout} className="text-[10px] font-black text-red-500 uppercase bg-red-50 px-4 py-2 rounded-full">
+    Sair
+  </button>
+</header>
 
         <section className="space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">🛒 Minhas Compras</h3>
