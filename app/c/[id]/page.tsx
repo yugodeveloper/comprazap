@@ -21,7 +21,7 @@ export default function LandingPageGourmetFinal() {
   const [buyerApto, setBuyerApto] = useState('')
   const [orderId, setOrderId] = useState<string | null>(null)
 
-  // Seleções Dinâmicas (Cuca, Café, etc)
+  // Seleções Dinâmicas
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
@@ -29,14 +29,30 @@ export default function LandingPageGourmetFinal() {
   const [uploading, setUploading] = useState(false)
   const [currentReceipt, setCurrentReceipt] = useState<string | null>(null)
 
-  // --- 1. MEMÓRIA DE SESSÃO (LOCALSTORAGE) ---
+  // --- 1. SESSÃO, VIEWS ÚNICAS E RECUPERAÇÃO DE PEDIDO ---
   useEffect(() => {
     if (!id) return;
+
+    // Lógica de Visualização Única
+    const handleViewCount = async () => {
+      const viewKey = `viewed_${id}`;
+      const alreadyViewed = localStorage.getItem(viewKey);
+
+      if (!alreadyViewed) {
+        // Incrementa no Supabase via RPC (ou update simples se o RPC não existir)
+        const { error } = await supabase.rpc('increment_campaign_views', { row_id: id });
+        
+        // Se o RPC falhar ou não estiver criado, marcamos localmente de qualquer forma para não tentar sempre
+        localStorage.setItem(viewKey, 'true');
+      }
+    };
+    handleViewCount();
+
+    // Recupera pedido em aberto
     const savedOrderId = localStorage.getItem(`order_${id}`);
     if (savedOrderId) {
       setOrderId(savedOrderId);
       setStep('checkout');
-      // Tenta recuperar se já havia um comprovante enviado
       const checkOrder = async () => {
         const { data } = await supabase.from('orders').select('status, receipt_url, buyer_name').eq('id', savedOrderId).single();
         if (data) {
@@ -49,7 +65,7 @@ export default function LandingPageGourmetFinal() {
     }
   }, [id]);
 
-  // --- 2. CARREGAMENTO DOS DADOS DA CAMPANHA ---
+  // --- 2. CARREGAMENTO DOS DADOS ---
   useEffect(() => {
     if (!id) return
     const fetchData = async () => {
@@ -67,9 +83,7 @@ export default function LandingPageGourmetFinal() {
         if (pd?.variations) {
           const defaults: any = {}
           Object.keys(pd.variations).forEach(key => {
-            if (pd.variations[key] && pd.variations[key].length > 0) {
-              defaults[key] = pd.variations[key][0]
-            }
+            if (pd.variations[key]?.length > 0) defaults[key] = pd.variations[key][0]
           })
           setSelectedVariations(defaults)
         }
@@ -80,19 +94,12 @@ export default function LandingPageGourmetFinal() {
     fetchData()
   }, [id])
 
-  // --- 3. ESCUTA EM TEMPO REAL (REALTIME) ---
+  // --- 3. REALTIME STATUS ---
   useEffect(() => {
     if (!orderId) return;
-
     const subscription = supabase
       .channel(`status-order-${orderId}`)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'orders', 
-        filter: `id=eq.${orderId}` 
-      }, 
-      (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
         if (payload.new.status === 'paid') {
           alert("🎉 Pagamento confirmado pelo vendedor!");
           setCurrentReceipt('confirmed');
@@ -100,109 +107,62 @@ export default function LandingPageGourmetFinal() {
           alert("⚠️ Comprovante inválido. Por favor, envie novamente.");
           setCurrentReceipt(null); 
         }
-      })
-      .subscribe();
-
+      }).subscribe();
     return () => { supabase.removeChannel(subscription) };
   }, [orderId]);
 
-  // --- 4. FUNÇÕES DE NOTIFICAÇÃO TELEGRAM ---
+  // --- 4. FUNÇÕES TELEGRAM ---
   const enviarNotificacaoTelegram = async (order: any) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
-
-    const mensagem = `
-💰 *NOVO PEDIDO NO COMPRAZAP!*
---------------------------------
-📦 *Produto:* ${campaign?.title}
-👤 *Cliente:* ${order.buyer_name}
-🏠 *Apto:* ${order.buyer_apto}
-🔢 *Qtd:* ${order.quantity}x
-✨ *Opções:* ${JSON.stringify(order.selected_variations)}
-💵 *Total:* R$ ${(product.price * order.quantity).toFixed(2)}
---------------------------------
-📱 *Contato:* ${order.buyer_contact}
-    `;
-
+    const mensagem = `💰 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Produto:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Qtd:* ${order.quantity}x\n💵 *Total:* R$ ${(product.price * order.quantity).toFixed(2)}\n--------------------------------\n📱 *Contato:* ${order.buyer_contact}`;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' })
       });
-    } catch (err) { console.error("Erro Telegram:", err); }
+    } catch (err) { console.error(err); }
   };
 
   const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-
     await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
-        photo: imageUrl,
-        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n\nVocê aceita este pagamento?`,
+        chat_id: chatId, photo: imageUrl,
+        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n\nAceita este pagamento?`,
         parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "✅ Aceitar", callback_data: `confirm_${oId}` },
-              { text: "❌ Recusar", callback_data: `reject_${oId}` }
-            ]
-          ]
-        }
+        reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
       })
     });
   };
 
-  // --- 5. HANDLERS (AÇÕES) ---
   const handleOrder = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    
+    e.preventDefault(); setLoading(true);
     try {
-      const orderData = { 
-        campaign_id: id, 
-        product_id: product?.id, 
-        buyer_contact: contact, 
-        buyer_name: buyerName, 
-        buyer_apto: buyerApto, 
-        status: 'pending',
-        selected_variations: selectedVariations, 
-        quantity: quantity
-      }
-
+      const orderData = { campaign_id: id, product_id: product?.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, status: 'pending', selected_variations: selectedVariations, quantity: quantity }
       const { data, error } = await supabase.from('orders').insert(orderData).select().single()
-
       if (error) throw error
       if (data) {
-        setOrderId(data.id)
-        localStorage.setItem(`order_${id}`, data.id); 
-        setStep('checkout')
-        enviarNotificacaoTelegram(data);
+        setOrderId(data.id); localStorage.setItem(`order_${id}`, data.id); 
+        setStep('checkout'); enviarNotificacaoTelegram(data);
       }
-    } catch (err: any) {
-      alert("Erro ao confirmar reserva: " + err.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err: any) { alert(err.message) } finally { setLoading(false) }
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !orderId) return
     setUploading(true)
     const file = e.target.files[0]
-    const fileName = `${orderId}-${Date.now()}`
-
+    const fileName = `receipts/${orderId}-${Date.now()}`
     const { error: upErr } = await supabase.storage.from('comprovantes').upload(fileName, file)
-    
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
-      await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', orderId)
-      
+      await supabase.from('orders').update({ receipt_url: publicUrl }).eq('id', orderId)
       await enviarComprovanteTelegram(publicUrl, buyerName, orderId);
       setCurrentReceipt(publicUrl)
     }
@@ -211,64 +171,69 @@ export default function LandingPageGourmetFinal() {
 
   const calculateTotal = () => (product?.price || 0) * quantity
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-white text-slate-900 font-bold">
-      Carregando oferta Lanai...
-    </div>
-  )
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-white font-black uppercase text-xs tracking-widest animate-pulse">Lanai Loading...</div>
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 pb-20">
       <div className="mx-auto max-w-md bg-white min-h-screen shadow-2xl overflow-hidden">
         
-        <div className="relative h-72 w-full bg-slate-200">
+        {/* IMAGEM PADRONIZADA (ASPECT RATIO 16:9) */}
+        <div className="relative w-full aspect-video bg-slate-200 overflow-hidden">
           {campaign?.image_url ? (
-            <img src={campaign.image_url} alt="Capa" className="h-full w-full object-cover" />
+            <img 
+              src={campaign.image_url} 
+              alt="Capa da Campanha" 
+              className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105" 
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-6xl">🎁</div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
           <div className="absolute bottom-6 left-6 right-6">
-            <h1 className="text-2xl font-black text-white leading-tight">{campaign?.title}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest">Vizinho Vendedor: {seller?.full_name}</span>
+            <h1 className="text-3xl font-black text-white leading-tight italic tracking-tighter">{campaign?.title}</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em]">Por: {seller?.full_name}</span>
             </div>
           </div>
         </div>
 
-        <div className="p-6 space-y-8">
-          <div className="border-b border-slate-100 pb-6">
-            <p className="text-slate-500 text-sm leading-relaxed">{campaign?.description}</p>
+        <div className="p-8 space-y-10">
+          <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100">
+            <p className="text-slate-600 text-sm font-medium leading-relaxed">{campaign?.description}</p>
           </div>
 
           {step === 'identificacao' && (
-            <div className="space-y-4 animate-in fade-in duration-500">
-              <h2 className="text-lg font-bold text-slate-900">Para começar, seu contato:</h2>
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="space-y-2 text-center">
+                <h2 className="text-xl font-black italic tracking-tight">Quem está pedindo?</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apenas para o vendedor se organizar</p>
+              </div>
               <input 
-                type="text" placeholder="E-mail ou WhatsApp" 
-                className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 font-medium"
+                type="text" placeholder="Seu WhatsApp ou E-mail" 
+                className="w-full rounded-[24px] bg-slate-100 p-5 text-slate-900 placeholder:text-slate-400 outline-none border-2 border-transparent focus:border-slate-900 font-bold transition-all"
                 value={contact} onChange={e => setContact(e.target.value)}
               />
-              <button onClick={() => setStep('reserva')} className="w-full rounded-2xl bg-slate-900 p-5 font-black text-white shadow-xl hover:bg-slate-800 active:scale-95 transition-all">
-                CONTINUAR PARA RESERVA
+              <button onClick={() => setStep('reserva')} className="w-full rounded-[30px] bg-slate-900 p-6 font-black text-white shadow-2xl shadow-slate-200 active:scale-95 transition-all uppercase text-sm tracking-widest">
+                VER PRODUTO
               </button>
             </div>
           )}
 
           {step === 'reserva' && (
-            <form onSubmit={handleOrder} className="space-y-6 animate-in slide-in-from-right duration-500">
+            <form onSubmit={handleOrder} className="space-y-8 animate-in slide-in-from-right duration-500">
               {product?.variations && Object.keys(product.variations).map(key => (
-                <div key={key} className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{key}</label>
-                  <div className="flex flex-wrap gap-2">
+                <div key={key} className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2">{key}</label>
+                  <div className="flex flex-wrap gap-3">
                     {product.variations[key].map((v: string) => (
                       <button 
                         key={v} type="button"
                         onClick={() => setSelectedVariations({...selectedVariations, [key]: v})}
-                        className={`px-5 py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                        className={`px-6 py-4 rounded-2xl text-xs font-black transition-all border-2 ${
                           selectedVariations[key] === v 
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-md' 
-                          : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-xl' 
+                          : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'
                         }`}
                       >
                         {v}
@@ -278,89 +243,68 @@ export default function LandingPageGourmetFinal() {
                 </div>
               ))}
 
-              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                <span className="font-bold text-slate-700">Quantidade</span>
-                <div className="flex items-center gap-4">
-                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black border border-slate-200 text-slate-900">-</button>
-                  <span className="font-mono font-black text-lg text-slate-900 w-6 text-center">{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black border border-slate-200 text-slate-900">+</button>
+              <div className="flex items-center justify-between rounded-[32px] bg-slate-900 p-6 text-white shadow-xl">
+                <span className="font-black uppercase text-[10px] tracking-widest">Quantidade</span>
+                <div className="flex items-center gap-6">
+                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} className="h-10 w-10 rounded-full bg-white/10 font-black text-xl hover:bg-white/20">-</button>
+                  <span className="font-black text-xl w-6 text-center">{quantity}</span>
+                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="h-10 w-10 rounded-full bg-white/10 font-black text-xl hover:bg-white/20">+</button>
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <input 
-                  placeholder="Seu Nome Completo" required 
-                  className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 font-medium" 
-                  value={buyerName} onChange={e => setBuyerName(e.target.value)} 
-                />
-                <input 
-                  placeholder="Apto / Unidade" required 
-                  className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 font-medium" 
-                  value={buyerApto} onChange={e => setBuyerApto(e.target.value)} 
-                />
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <input placeholder="Seu Nome" required className="w-full rounded-[24px] bg-slate-100 p-5 font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+                <input placeholder="Unidade / Apto" required className="w-full rounded-[24px] bg-slate-100 p-5 font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all" value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               </div>
 
-              <button type="submit" className="w-full rounded-2xl bg-green-600 p-5 font-black text-white shadow-xl shadow-green-100 hover:bg-green-700 active:scale-95 transition-all">
-                CONFIRMAR R$ {calculateTotal().toFixed(2)}
+              <button type="submit" className="w-full rounded-[30px] bg-green-600 p-6 font-black text-white shadow-2xl shadow-green-100 uppercase text-sm tracking-widest">
+                RESERVAR R$ {calculateTotal().toFixed(2)}
               </button>
             </form>
           )}
 
           {step === 'checkout' && (
-            <div className="space-y-6 text-center animate-in zoom-in duration-500">
-              <div className="rounded-[40px] bg-slate-900 p-8 text-white shadow-2xl">
-                <p className="mb-4 text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">Pague agora via Pix</p>
-                <div className="mx-auto mb-6 inline-block rounded-3xl bg-white p-4">
-                  <QRCodeSVG value={campaign?.pix_key || ''} size={180} />
+            <div className="space-y-8 animate-in zoom-in duration-500">
+              <div className="rounded-[40px] bg-slate-900 p-8 text-white shadow-2xl text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-400 mb-6">Pague agora via Pix</p>
+                <div className="mx-auto mb-8 inline-block rounded-[32px] bg-white p-6 shadow-inner">
+                  <QRCodeSVG value={campaign?.pix_key || ''} size={200} />
                 </div>
-                
-                <div className="bg-slate-800 p-4 rounded-2xl mb-6 border border-slate-700">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Chave Copia e Cola</p>
-                  <p className="font-mono text-xs break-all text-blue-300 select-all">{campaign?.pix_key}</p>
+                <div className="bg-white/5 p-5 rounded-3xl border border-white/10 mb-8 select-all active:bg-white/10 transition-all cursor-copy">
+                   <p className="text-[9px] text-white/40 font-black uppercase mb-2">Chave Pix Copia e Cola</p>
+                   <p className="font-mono text-[10px] break-all text-blue-300 leading-tight">{campaign?.pix_key}</p>
                 </div>
-
-                <div className="border-t border-white/10 pt-4 flex justify-between items-center px-2">
-                   <span className="text-slate-400 text-xs font-bold">TOTAL A PAGAR</span>
-                   <span className="text-2xl font-black">R$ {calculateTotal().toFixed(2)}</span>
+                <div className="flex justify-between items-center px-2">
+                   <span className="text-white/40 text-[10px] font-black uppercase tracking-tighter">Total a Pagar</span>
+                   <span className="text-3xl font-black italic">R$ {calculateTotal().toFixed(2)}</span>
                 </div>
               </div>
 
-              <div className="rounded-3xl bg-white p-6 border-2 border-dashed border-slate-200">
-                <p className="mb-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Enviar Comprovante</p>
-                
+              <div className="rounded-[32px] bg-white p-8 border-2 border-dashed border-slate-200 text-center">
                 {currentReceipt === 'confirmed' ? (
-                   <div className="mt-4 p-8 bg-green-50 rounded-[32px] border-2 border-green-200 animate-bounce">
-                     <p className="text-4xl mb-2">🚀</p>
-                     <p className="text-green-800 font-black text-lg">PAGAMENTO CONFIRMADO!</p>
-                     <p className="text-green-600 text-sm font-bold">O vendedor já está preparando seu pedido.</p>
+                   <div className="p-6 bg-green-50 rounded-2xl border-2 border-green-200 flex flex-col items-center">
+                     <span className="text-4xl mb-3">✅</span>
+                     <p className="text-green-800 font-black text-sm uppercase tracking-widest">Pagamento Confirmado!</p>
+                     <p className="text-green-600 text-[10px] font-bold mt-1">O vendedor já foi notificado.</p>
                    </div>
                 ) : (
                   <>
-                    <input 
-                      type="file" accept="image/*" onChange={handleFileUpload}
-                      className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-900 file:text-white file:font-bold cursor-pointer" 
-                    />
-                    
-                    {currentReceipt ? (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm font-bold border border-blue-100 flex items-center justify-center gap-2">
-                        ⏳ Comprovante em análise...
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Envie o Comprovante</p>
+                    <div className="relative group">
+                      <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                      <div className="w-full py-5 bg-slate-100 rounded-2xl font-black text-[10px] text-slate-600 uppercase border-2 border-transparent group-hover:border-slate-900 transition-all flex items-center justify-center gap-2">
+                        <span>📸</span> {uploading ? 'SUBINDO...' : currentReceipt ? 'SUBIR OUTRO' : 'ANEXAR COMPROVANTE'}
                       </div>
-                    ) : (
-                      <p className="mt-4 text-[10px] text-slate-400 font-bold uppercase tracking-tight">Anexe o print para validar sua reserva</p>
-                    )}
+                    </div>
+                    {currentReceipt && !uploading && <p className="mt-4 text-[9px] font-black text-blue-600 animate-pulse uppercase tracking-widest italic">Aguardando validação do vizinho...</p>}
                   </>
-                )}
-                
-                {uploading && (
-                  <p className="mt-4 animate-pulse text-xs text-blue-600 font-black uppercase tracking-widest">Enviando Arquivo...</p>
                 )}
               </div>
             </div>
           )}
-
         </div>
       </div>
-      <p className="mt-8 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest pb-10">
+      <p className="mt-10 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">
         CompraZap ⚡ Lanai
       </p>
     </div>
