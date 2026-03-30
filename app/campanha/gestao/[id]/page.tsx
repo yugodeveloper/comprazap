@@ -12,15 +12,14 @@ export default function GestaoCampanha() {
   const [campaign, setCampaign] = useState<any>(null)
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedImg, setSelectedImg] = useState<string | null>(null) // Para o Modal da foto
 
   const fetchData = async () => {
     if (!id) return
     try {
-      // Busca a campanha para pegar as Views
       const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single()
       setCampaign(cp)
       
-      // Busca as ordens
       const { data: ords } = await supabase
         .from('orders')
         .select('*')
@@ -36,7 +35,6 @@ export default function GestaoCampanha() {
 
   useEffect(() => {
     fetchData()
-    // Realtime para o vendedor ver os pedidos chegando
     const channel = supabase
       .channel(`gestao-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `campaign_id=eq.${id}` }, () => {
@@ -47,7 +45,6 @@ export default function GestaoCampanha() {
     return () => { supabase.removeChannel(channel) }
   }, [id])
 
-  // --- AÇÃO DE MODERAR PAGAMENTO ---
   const handleStatus = async (orderId: string, newStatus: 'paid' | 'rejected') => {
     const confirmacao = newStatus === 'paid' 
       ? "Confirmar este pagamento?" 
@@ -61,83 +58,102 @@ export default function GestaoCampanha() {
       .eq('id', orderId)
 
     if (!error) {
-      // Atualiza a lista local imediatamente
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
     } else {
       alert("Erro ao atualizar status: " + error.message)
     }
   }
 
+  // --- ESTILOS FIXOS ANTI-CACHE ---
+  const cardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '32px', border: '1px solid #f5f5f4', marginBottom: '15px' };
+  const badgeStyle = (status: string): React.CSSProperties => ({
+    fontSize: '9px', fontWeight: '900', padding: '5px 12px', borderRadius: '50px', textTransform: 'uppercase',
+    backgroundColor: status === 'paid' ? '#dcfce7' : status === 'rejected' ? '#fee2e2' : '#fef9c3',
+    color: status === 'paid' ? '#166534' : status === 'rejected' ? '#991b1b' : '#854d0e'
+  });
+
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <p className="font-black text-[10px] uppercase tracking-widest animate-pulse">Carregando Painel...</p>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
+      <p style={{ fontWeight: '900', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#059669' }}>Carregando Painel...</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
-      <div className="max-w-md mx-auto p-6 space-y-8">
+    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '20px', fontFamily: 'sans-serif', color: '#1c1917' }}>
+      <div style={{ maxWidth: '450px', margin: '0 auto' }}>
         
-        <header className="flex justify-between items-center">
-          <button onClick={() => router.push('/')} className="text-[10px] font-black uppercase text-slate-400">← Voltar</button>
-          <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-tighter">Painel do Vendedor</span>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+          <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase', cursor: 'pointer' }}>← Voltar</button>
+          <span style={{ fontSize: '9px', fontWeight: '900', backgroundColor: '#0c0a09', color: 'white', padding: '6px 15px', borderRadius: '50px', textTransform: 'uppercase', letterSpacing: '1px' }}>Gestão de Vendas</span>
         </header>
 
-        {/* CARD DE MÉTRICAS */}
-        <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
-          <h1 className="text-2xl font-black italic tracking-tighter mb-6">{campaign?.title}</h1>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-slate-50 p-4 rounded-3xl text-center">
-              <p className="text-xl font-black">{campaign?.views || 0}</p>
-              <p className="text-[8px] font-black text-slate-400 uppercase">Visitas</p>
+        {/* MÉTRICAS GOURMET */}
+        <div style={{ ...cardStyle, textAlign: 'center' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '900', fontStyle: 'italic', margin: '0 0 20px 0', color: '#0c0a09' }}>{campaign?.title}</h1>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            <div style={{ backgroundColor: '#f5f5f4', padding: '15px', borderRadius: '20px' }}>
+              <p style={{ margin: 0, fontWeight: '900', fontSize: '18px' }}>{campaign?.views || 0}</p>
+              <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: '#a8a29e' }}>VIEWS</p>
             </div>
-            <div className="bg-blue-50 p-4 rounded-3xl text-center">
-              <p className="text-xl font-black text-blue-600">{orders.length}</p>
-              <p className="text-[8px] font-black text-slate-400 uppercase">Pedidos</p>
+            <div style={{ backgroundColor: '#f0fdf4', padding: '15px', borderRadius: '20px' }}>
+              <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#059669' }}>{orders.length}</p>
+              <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: '#a8a29e' }}>PEDIDOS</p>
             </div>
-            <div className="bg-green-50 p-4 rounded-3xl text-center">
-              <p className="text-xl font-black text-green-600">{orders.filter(o => o.status === 'paid').length}</p>
-              <p className="text-[8px] font-black text-slate-400 uppercase">Pagos</p>
+            <div style={{ backgroundColor: '#0c0a09', padding: '15px', borderRadius: '20px' }}>
+              <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: 'white' }}>{orders.filter(o => o.status === 'paid').length}</p>
+              <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: '#a8a29e' }}>PAGOS</p>
             </div>
           </div>
         </div>
 
         {/* LISTA DE PEDIDOS */}
-        <div className="space-y-4">
-          <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Moderação de Pagamentos</h2>
+        <div style={{ marginTop: '30px' }}>
+          <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '2px', paddingLeft: '15px', marginBottom: '15px' }}>Pedidos Recentes</h2>
           
           {orders.map(order => (
-            <div key={order.id} className="bg-white p-6 rounded-[32px] border border-slate-100 space-y-4">
-              <div className="flex justify-between items-start">
+            <div key={order.id} style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
                 <div>
-                  <p className="font-black text-sm">{order.buyer_name}</p>
-                  <p className="text-[10px] font-bold text-slate-400">{order.buyer_apto} • Un: {order.quantity}</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '15px' }}>{order.buyer_name}</p>
+                  <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#a8a29e' }}>{order.buyer_apto} • {new Date(order.created_at).toLocaleDateString()}</p>
                 </div>
-                <div className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase ${
-                  order.status === 'paid' ? 'bg-green-100 text-green-600' : 
-                  order.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
-                }`}>
-                  {order.status === 'paid' ? 'Pago' : order.status === 'rejected' ? 'Rejeitado' : 'Pendente'}
+                <div style={badgeStyle(order.status)}>
+                  {order.status === 'paid' ? 'Aprovado' : order.status === 'rejected' ? 'Recusado' : 'Pendente'}
                 </div>
               </div>
 
+              {/* LISTA DE ITENS DO PEDIDO (Novo formato de lista) */}
+              <div style={{ backgroundColor: '#fafaf9', padding: '12px', borderRadius: '15px', marginBottom: '15px' }}>
+                 {Array.isArray(order.selected_variations) ? order.selected_variations.map((item: any, idx: number) => (
+                    <div key={idx} style={{ fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{item.qty}x {item.name}</span>
+                        <span>R$ {item.total?.toFixed(2)}</span>
+                    </div>
+                 )) : <p style={{ fontSize: '11px' }}>Pedido: {order.quantity} un.</p>}
+              </div>
+
               {order.receipt_url ? (
-                <div className="space-y-4">
-                  <a href={order.receipt_url} target="_blank" className="block w-full h-40 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
-                    <img src={order.receipt_url} className="w-full h-full object-cover" alt="Comprovante" />
-                  </a>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* MINIATURA DO COMPROVANTE */}
+                  <div 
+                    onClick={() => setSelectedImg(order.receipt_url)}
+                    style={{ width: '80px', height: '80px', borderRadius: '15px', overflow: 'hidden', border: '2px solid #059669', cursor: 'pointer', position: 'relative' }}
+                  >
+                    <img src={order.receipt_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Comprovante" />
+                    <div style={{ position: 'absolute', bottom: 0, width: '100%', background: 'rgba(5, 150, 105, 0.8)', color: 'white', fontSize: '8px', textAlign: 'center', fontWeight: '900', padding: '2px 0' }}>VER FOTO</div>
+                  </div>
                   
                   {order.status !== 'paid' && (
-                    <div className="flex gap-2">
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                       <button 
                         onClick={() => handleStatus(order.id, 'paid')}
-                        className="flex-1 bg-green-600 text-white py-4 rounded-xl font-black text-[10px] uppercase shadow-lg shadow-green-100"
+                        style={{ flex: 1, backgroundColor: '#059669', color: 'white', border: 'none', padding: '15px', borderRadius: '15px', fontWeight: '900', fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer' }}
                       >
                         Confirmar
                       </button>
                       <button 
                         onClick={() => handleStatus(order.id, 'rejected')}
-                        className="px-6 bg-red-50 text-red-500 py-4 rounded-xl font-black text-[10px] uppercase"
+                        style={{ backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', padding: '15px', borderRadius: '15px', fontWeight: '900', fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer' }}
                       >
                         Recusar
                       </button>
@@ -145,13 +161,27 @@ export default function GestaoCampanha() {
                   )}
                 </div>
               ) : (
-                <div className="py-4 bg-slate-50 rounded-2xl text-center">
-                  <p className="text-[9px] font-black text-slate-300 uppercase italic">Aguardando comprovante...</p>
+                <div style={{ padding: '15px', backgroundColor: '#fafaf9', borderRadius: '15px', textAlign: 'center', border: '1px dashed #e7e5e4' }}>
+                  <p style={{ margin: 0, fontSize: '9px', fontWeight: '900', color: '#d6d3d1', textTransform: 'uppercase' }}>Aguardando Pix...</p>
                 </div>
               )}
             </div>
           ))}
         </div>
+
+        {/* MODAL LIGHTBOX PARA A FOTO */}
+        {selectedImg && (
+          <div 
+            onClick={() => setSelectedImg(null)}
+            style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
+          >
+            <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '80%' }}>
+              <img src={selectedImg} style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '20px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }} />
+              <p style={{ color: 'white', textAlign: 'center', fontWeight: '900', marginTop: '15px', fontSize: '12px' }}>CLIQUE PARA FECHAR</p>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   )
