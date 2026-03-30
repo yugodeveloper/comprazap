@@ -15,7 +15,9 @@ export default function LandingPageGourmetFinal() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   
-  const [step, setStep] = useState<'itens' | 'identificacao' | 'dados' | 'concluido'>('itens')
+  // Alterado: Começamos pela identificação
+  const [step, setStep] = useState<'identificacao' | 'itens' | 'dados' | 'concluido'>('identificacao')
+  
   const [contact, setContact] = useState('')
   const [buyerName, setBuyerName] = useState('')
   const [buyerApto, setBuyerApto] = useState('')
@@ -36,7 +38,6 @@ export default function LandingPageGourmetFinal() {
     if (!existingOrder?.id) return;
     const channel = supabase.channel(`order-status-${existingOrder.id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${existingOrder.id}` }, (payload) => {
         setOrderStatus(payload.new.status);
-        // Atualiza a URL do recibo caso ela tenha sido enviada
         if (payload.new.receipt_url) {
            setExistingOrder((prev: any) => ({ ...prev, receipt_url: payload.new.receipt_url }));
         }
@@ -59,42 +60,35 @@ export default function LandingPageGourmetFinal() {
 
   const totalGeral = itemsList.reduce((acc, curr) => acc + curr.total, 0);
 
-  const enviarNotificacaoTelegram = async (order: any) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    const itensMsg = itemsList.map(i => `${i.qty}x ${i.name}`).join(', ');
-    const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${totalGeral.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
-    try {
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' }) });
-    } catch (err) { console.error(err); }
-  };
-
-  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    try {
-      await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${totalGeral.toFixed(2)}\n\nAceita este pagamento?`, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] } }) });
-    } catch (err) { console.error(err); }
-  };
-
+  // --- LÓGICA DE IDENTIFICAÇÃO (AGORA É O PASSO 1) ---
   const handleIdentificacao = async () => {
     if (contact.length < 10) return alert("WhatsApp inválido");
     setLoading(true);
+    
     const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', contact).order('created_at', { ascending: false });
     const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', contact).order('created_at', { ascending: false }).limit(1).maybeSingle();
+
     if (orders && orders.length > 0) {
       const pending = orders.find((o: any) => o.status !== 'paid');
       setPastOrders(orders.filter((o: any) => o.status === 'paid'));
+      
       if (pending) {
         setExistingOrder(pending);
         setOrderStatus(pending.status);
-        if (itemsList.length === 0 && Array.isArray(pending.selected_variations)) setItemsList(pending.selected_variations);
+        if (Array.isArray(pending.selected_variations)) {
+          setItemsList(pending.selected_variations);
+          // 🚀 SE JÁ TEM PEDIDO PENDENTE, VAI DIRETO PRO FINAL
+          setStep('concluido');
+          setLoading(false);
+          return;
+        }
       }
     }
+
     if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
-    setStep('dados');
+    
+    // Se não tem nada pendente, vai escolher os itens
+    setStep('itens');
     setLoading(false);
   };
 
@@ -102,6 +96,7 @@ export default function LandingPageGourmetFinal() {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
     setLoading(true);
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending' };
+    
     let savedOrder;
     if (existingOrder && orderStatus !== 'paid') { 
       const { data } = await supabase.from('orders').update(orderData).eq('id', existingOrder.id).select().single(); 
@@ -110,9 +105,9 @@ export default function LandingPageGourmetFinal() {
       const { data } = await supabase.from('orders').insert(orderData).select().single(); 
       savedOrder = data; 
     }
+    
     setExistingOrder(savedOrder);
     setOrderStatus(savedOrder.status);
-    await enviarNotificacaoTelegram(savedOrder);
     setStep('concluido');
     setLoading(false);
   };
@@ -126,18 +121,12 @@ export default function LandingPageGourmetFinal() {
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
       await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
-      
-      // Força o estado local para refletir que o comprovante foi enviado, mas aguarda aprovação
       setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
-      setOrderStatus('pending'); 
-
-      await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id);
+      setOrderStatus('pending');
       alert("Comprovante enviado!");
     }
     setUploading(false);
   };
-
-  const handleNewOrder = () => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); };
 
   if (loading) return <div style={{textAlign:'center', marginTop:50, fontWeight:'bold', color: '#059669'}}>Lanai Loading...</div>
 
@@ -145,7 +134,7 @@ export default function LandingPageGourmetFinal() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* HEADER */}
+        {/* HEADER SEMPRE VISÍVEL */}
         <div style={{ height: '180px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           <img src={campaign?.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -155,10 +144,25 @@ export default function LandingPageGourmetFinal() {
 
         <div style={{ padding: 20 }}>
           
+          {/* STEP 1: IDENTIFICAÇÃO (Com Descrição da Campanha) */}
+          {step === 'identificacao' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '25px', marginBottom: '20px', border: '1px solid #f1f5f9' }}>
+                <p style={{ color: '#475569', fontSize: 14, lineHeight: '1.6', margin: 0 }}>{campaign?.description}</p>
+              </div>
+              <h3 style={{ fontWeight: 900, marginTop: 20 }}>Olá! Qual seu WhatsApp?</h3>
+              <p style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Digite para ver a oferta ou seus pedidos.</p>
+              <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(e.target.value)} />
+              <button onClick={handleIdentificacao} style={btnStyle}>ACESSAR OFERTA</button>
+            </div>
+          )}
+
+          {/* STEP 2: MONTAGEM DO PEDIDO */}
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <button onClick={() => setStep('identificacao')} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Telefone</button>
               <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
-                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
+                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>ESCOLHA OS ITENS</p>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {product?.variations?.map((v: any, index: number) => (
                     <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '12px 18px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '13px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>{v.name}<br/><span style={{fontSize: 10}}>R$ {v.price}</span></button>
@@ -173,41 +177,34 @@ export default function LandingPageGourmetFinal() {
               </div>
               {itemsList.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: 20, borderRadius: 25 }}>
-                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>CARRINHO</p>
+                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>LISTA ATUAL</p>
                   {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <div style={{ display:'flex', alignItems:'center', gap: 15 }}> <span style={{ fontWeight: 'bold', color: '#059669' }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>✕</button> </div> </div> ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 20, marginTop: 10 }}>Total: R$ {totalGeral.toFixed(2)}</div>
-                  <button onClick={() => setStep('identificacao')} style={btnStyle}>PRÓXIMO PASSO</button>
+                  <button onClick={() => setStep('dados')} style={btnStyle}>FINALIZAR PEDIDO</button>
                 </div>
               )}
             </div>
           )}
 
-          {step === 'identificacao' && (
-            <div style={{ textAlign: 'center' }}>
-              <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999' }}>← Voltar</button>
-              <h3 style={{ fontWeight: 900, marginTop: 40 }}>Seu WhatsApp</h3>
-              <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(e.target.value)} />
-              <button onClick={handleIdentificacao} style={btnStyle}>CONTINUAR</button>
-            </div>
-          )}
-
+          {/* STEP 3: DADOS (NOME/APTO) */}
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
-              <button onClick={() => setStep('identificacao')} style={{ float: 'left', background: 'none', border: 'none', color: '#999' }}>← Voltar</button>
-              <h3 style={{ fontWeight: 900, marginTop: 40 }}>Dados de Entrega</h3>
+              <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999' }}>← Voltar</button>
+              <h3 style={{ fontWeight: 900, marginTop: 40 }}>Onde entregamos?</h3>
               <p style={{ fontSize: 13, fontWeight: 'bold', color: '#059669', marginBottom: 25 }}>📱 {contact}</p>
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR RESERVA</button>
+
               {pastOrders.length > 0 && (
                 <div style={{ marginTop: 40, textAlign: 'left', borderTop: '1px solid #eee', paddingTop: 20 }}>
-                  <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 15 }}>Meus Pedidos Pagos ✅</p>
+                  <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 15 }}>Histórico de Compras ✅</p>
                   {pastOrders.map((order: any) => (
-                    <div key={order.id} style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '15px', marginBottom: '10px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '5px' }}>{new Date(order.created_at).toLocaleDateString()}</div>
-                      {Array.isArray(order.selected_variations) ? order.selected_variations.map((item: any, idx: number) => (
+                    <div key={order.id} style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '15px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }}>{new Date(order.created_at).toLocaleDateString()}</div>
+                      {Array.isArray(order.selected_variations) && order.selected_variations.map((item: any, idx: number) => (
                         <div key={idx} style={{ fontSize: '12px' }}>{item.qty}x {item.name}</div>
-                      )) : <div style={{fontSize: '12px'}}>Pedido realizado</div>}
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -215,33 +212,32 @@ export default function LandingPageGourmetFinal() {
             </div>
           )}
 
+          {/* STEP 4: CONCLUÍDO / PIX */}
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
-              {/* --- 🛠️ LÓGICA DE MENSAGENS CORRIGIDA --- */}
               {orderStatus === 'paid' ? (
-                <div style={{ background: '#dcfce7', color: '#166534', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>✅ Pagamento aprovado! Pedido concluído.</div>
+                <div style={{ background: '#dcfce7', color: '#166534', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>✅ Pagamento aprovado!</div>
               ) : orderStatus === 'rejected' ? (
-                <div style={{ background: '#fee2e2', color: '#991b1b', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⚠️ Comprovante rejeitado, envie um válido.</div>
+                <div style={{ background: '#fee2e2', color: '#991b1b', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⚠️ Rejeitado. Envie um novo comprovante.</div>
               ) : existingOrder?.receipt_url ? (
-                <div style={{ background: '#fef9c3', color: '#854d0e', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⏳ Aguardando aprovação do vendedor...</div>
+                <div style={{ background: '#fef9c3', color: '#854d0e', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⏳ Aguardando aprovação...</div>
               ) : (
-                <div style={{ background: '#f1f5f9', color: '#475569', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>Aguardando envio do comprovante... 📝</div>
+                <div style={{ background: '#f1f5f9', color: '#475569', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>Aguardando o Pix... 📝</div>
               )}
 
               <div style={{ background: 'white', padding: 25, borderRadius: 30, border: '2px solid #f1f5f9', marginBottom: 20 }}>
                 <QRCodeSVG value={campaign?.pix_key || ''} size={180} />
                 <p style={{ fontWeight: 900, fontSize: 24, color: '#059669', margin: '15px 0' }}>R$ {totalGeral.toFixed(2)}</p>
-                <div style={{ background: '#f8fafc', padding: 10, borderRadius: 10, fontSize: 11 }}>{campaign?.pix_key}</div>
+                <div style={{ background: '#f8fafc', padding: 10, borderRadius: 10, fontSize: 11, border: '1px solid #e2e8f0' }}>{campaign?.pix_key}</div>
               </div>
 
               {orderStatus === 'paid' ? (
-                <button onClick={handleNewOrder} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
+                <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
               ) : (
                 <>
                   <div style={{ marginBottom: 25 }}>
-                    <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Anexe o comprovante Pix:</p>
+                    <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Anexe o comprovante abaixo:</p>
                     <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} style={{ fontSize: 12 }} />
-                    {uploading && <p style={{fontSize:10, color:'#059669', marginTop:5}}>Enviando...</p>}
                   </div>
                   <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR PEDIDO</button>
                 </>
