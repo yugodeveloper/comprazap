@@ -60,9 +60,18 @@ export default function PortalCondominio() {
   };
 
   const handleEndCampaign = async (campId: string) => {
+    if(!confirm("Encerrar esta campanha agora?")) return;
     const now = new Date().toISOString();
     await supabase.from('campaigns').update({ expires_at: now, status: 'expired' }).eq('id', campId);
     setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: now, status: 'expired' } : c));
+  };
+
+  const handleReactivate = async (campId: string) => {
+    const novaData = new Date();
+    novaData.setDate(novaData.getDate() + 7);
+    const expiresAt = novaData.toISOString();
+    await supabase.from('campaigns').update({ expires_at: expiresAt, status: 'active' }).eq('id', campId);
+    setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
   };
 
   const formatPhone = (v: string) => { v = v.replace(/\D/g, ""); v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); v = v.replace(/(\d{5})(\d)/, "$1-$2"); return v.substring(0, 15); }
@@ -99,41 +108,27 @@ export default function PortalCondominio() {
     finally { setLoading(false); } 
   }
 
-  // --- ESTILOS FIXOS (BLINDAGEM ANTI-CACHE) ---
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '20px', backgroundColor: '#f5f5f4', borderRadius: '20px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '15px' };
-  const btnEmerald: React.CSSProperties = { width: '100%', padding: '20px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '14px', letterSpacing: '2px', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(5, 150, 105, 0.3)' };
+  // --- ESTILOS FIXOS ---
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
+  const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
 
   if (!isLoggedIn) { 
       return (
       <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'sans-serif' }}>
-        <div style={{ textAlign: 'center', marginBottom: '50px' }}>
-          <h1 style={{ fontSize: '48px', fontWeight: '900', fontStyle: 'italic', margin: '0', color: '#0c0a09', letterSpacing: '-2px' }}>CompraZap⚡</h1>
-          <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '4px', marginTop: '5px' }}>Portal do Morador • Lanai</p>
-        </div>
-
-        <div style={{ width: '100%', maxWidth: '350px' }}>
+        <h1 style={{ fontSize: '36px', fontWeight: '900', fontStyle: 'italic', margin: '0', color: '#0c0a09' }}>CompraZap⚡</h1>
+        <p style={{ fontSize: '9px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '40px' }}>Portal Lanai</p>
+        <div style={{ width: '100%', maxWidth: '300px' }}>
           {view === 'phone' && (
-            <div style={{ animation: 'fadein 0.5s' }}>
-              <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '24px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
+            <>
+              <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
               <button onClick={handleCheckPhone} style={btnEmerald}>{loading ? '...' : 'ENTRAR'}</button>
-            </div>
+            </>
           )}
-
           {view === 'login' && (
             <form onSubmit={handleAuthAction}>
-              <h2 style={{ textAlign: 'center', fontWeight: '900', fontStyle: 'italic', marginBottom: '20px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
-              <input type="password" placeholder="Sua Senha" required style={{ ...inputStyle, fontSize: '20px' }} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
+              <p style={{ textAlign: 'center', fontWeight: '900', fontSize: '14px', marginBottom: '15px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</p>
+              <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               <button type="submit" style={btnEmerald}>CONFIRMAR</button>
-            </form>
-          )}
-
-          {view === 'signup' && (
-            <form onSubmit={handleAuthAction}>
-              <h2 style={{ textAlign: 'center', fontWeight: '900', fontStyle: 'italic', marginBottom: '20px' }}>Criar Perfil</h2>
-              <input placeholder="Nome Completo" required style={inputStyle} value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
-              <input placeholder="Unidade (Apto)" required style={inputStyle} value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
-              <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-              <button type="submit" style={btnEmerald}>CADASTRAR</button>
             </form>
           )}
         </div>
@@ -142,54 +137,58 @@ export default function PortalCondominio() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '20px', fontFamily: 'sans-serif', color: '#1c1917' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '15px', fontFamily: 'sans-serif', color: '#1c1917' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto' }}>
         
-        {/* HEADER */}
-        <header style={{ backgroundColor: 'white', padding: '25px', borderRadius: '30px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <header style={{ backgroundColor: 'white', padding: '15px 20px', borderRadius: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '22px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
-            <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>{savedProfile?.unit} • {phone}</p>
+            <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '18px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
+            <p style={{ margin: 0, fontSize: '9px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>{savedProfile?.unit}</p>
           </div>
-          <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '10px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '10px 15px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
+          <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '9px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '8px 12px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
         </header>
 
-        {/* VENDAS */}
-        <section style={{ marginBottom: '40px' }}>
-          <h3 style={{ fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '2px', paddingLeft: '15px', marginBottom: '15px' }}>💰 Suas Vendas</h3>
-          <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, marginBottom: '20px' }}>+ LANÇAR OFERTA</button>
+        <section>
+          <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, marginBottom: '20px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {myCampaigns.map(camp => {
               const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
               return (
-                <div key={camp.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '30px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                  <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                    <div style={{ width: '55px', height: '55px', borderRadius: '15px', backgroundColor: '#f5f5f4', overflow: 'hidden' }}>
+                <div key={camp.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '20px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#f5f5f4', overflow: 'hidden', flexShrink: 0 }}>
                       {camp.image_url && <img src={camp.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>{camp.title}</p>
-                      <p style={{ margin: 0, fontSize: '9px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: '900', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
+                      <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
                     </div>
-                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#f5f5f4', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}>📢</button>
+                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#f5f5f4', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>📢</button>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '15px 0', borderTop: '1px solid #f5f5f4', borderBottom: '1px solid #f5f5f4', textAlign: 'center' }}>
-                    <div><p style={{ margin: 0, fontWeight: '900' }}>{camp.views || 0}</p><p style={{ margin: 0, fontSize: '8px', color: '#a8a29e' }}>VISITAS</p></div>
-                    <div><p style={{ margin: 0, fontWeight: '900', color: '#059669' }}>{camp.orders?.length || 0}</p><p style={{ margin: 0, fontSize: '8px', color: '#a8a29e' }}>PEDIDOS</p></div>
-                    <div><p style={{ margin: 0, fontWeight: '900' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '8px', color: '#a8a29e' }}>PAGOS</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '8px 0', borderTop: '1px solid #fafafa', borderBottom: '1px solid #fafafa', textAlign: 'center' }}>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '12px' }}>{camp.views || 0}</p><p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>VIEWS</p></div>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '12px', color: '#059669' }}>{camp.orders?.length || 0}</p><p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>PEDIDOS</p></div>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '12px' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>PAGOS</p></div>
                   </div>
 
-                  <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ ...btnEmerald, padding: '15px', backgroundColor: '#0c0a09' }}>GERENCIAR VENDAS</button>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '9px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR</button>
+                    {isExpired ? (
+                      <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '9px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
+                    ) : (
+                      <button onClick={() => handleEndCampaign(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: '10px', fontSize: '9px', fontWeight: '900', cursor: 'pointer' }}>ENCERRAR</button>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         </section>
 
-        <footer style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '40px' }}>
-          <p style={{ fontSize: '10px', fontWeight: '900', color: '#d6d3d1', letterSpacing: '5px' }}>COMPRAZAP⚡LANAI</p>
+        <footer style={{ textAlign: 'center', paddingTop: '30px', paddingBottom: '30px' }}>
+          <p style={{ fontSize: '8px', fontWeight: '900', color: '#d6d3d1', letterSpacing: '4px' }}>COMPRAZAP⚡LANAI</p>
         </footer>
       </div>
     </div>
