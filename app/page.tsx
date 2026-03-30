@@ -59,19 +59,47 @@ export default function PortalCondominio() {
     alert("Link copiado! ✅");
   };
 
+  // --- AJUSTE: ENCERRAR COM DATA RETROATIVA PARA PERSISTÊNCIA ---
   const handleEndCampaign = async (campId: string) => {
     if(!confirm("Encerrar esta campanha agora?")) return;
-    const now = new Date().toISOString();
-    await supabase.from('campaigns').update({ expires_at: now, status: 'expired' }).eq('id', campId);
-    setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: now, status: 'expired' } : c));
+    
+    // Ontem, para garantir expiração imediata no banco
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const expiresAt = yesterday.toISOString();
+
+    setLoading(true);
+    const { error } = await supabase
+      .from('campaigns')
+      .update({ expires_at: expiresAt, status: 'expired' })
+      .eq('id', campId);
+
+    if (error) {
+      alert("Erro ao salvar no banco: " + error.message);
+    } else {
+      setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'expired' } : c));
+    }
+    setLoading(false);
   };
 
+  // --- AJUSTE: REATIVAR COM DATA FUTURA (7 DIAS) ---
   const handleReactivate = async (campId: string) => {
     const novaData = new Date();
     novaData.setDate(novaData.getDate() + 7);
     const expiresAt = novaData.toISOString();
-    await supabase.from('campaigns').update({ expires_at: expiresAt, status: 'active' }).eq('id', campId);
-    setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
+
+    setLoading(true);
+    const { error } = await supabase
+      .from('campaigns')
+      .update({ expires_at: expiresAt, status: 'active' })
+      .eq('id', campId);
+
+    if (error) {
+      alert("Erro ao reativar no banco: " + error.message);
+    } else {
+      setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
+    }
+    setLoading(false);
   };
 
   const formatPhone = (v: string) => { v = v.replace(/\D/g, ""); v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); v = v.replace(/(\d{5})(\d)/, "$1-$2"); return v.substring(0, 15); }
@@ -108,7 +136,7 @@ export default function PortalCondominio() {
     finally { setLoading(false); } 
   }
 
-  // --- ESTILOS FIXOS ---
+  // --- ESTILOS FIXOS (AJUSTADOS PARA COMPACTAÇÃO) ---
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
 
@@ -137,48 +165,49 @@ export default function PortalCondominio() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '15px', fontFamily: 'sans-serif', color: '#1c1917' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '12px', fontFamily: 'sans-serif', color: '#1c1917' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto' }}>
         
-        <header style={{ backgroundColor: 'white', padding: '15px 20px', borderRadius: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* HEADER COMPACTO */}
+        <header style={{ backgroundColor: 'white', padding: '12px 18px', borderRadius: '18px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '18px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
-            <p style={{ margin: 0, fontSize: '9px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>{savedProfile?.unit}</p>
+            <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>{savedProfile?.unit}</p>
           </div>
-          <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '9px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '8px 12px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
+          <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '8px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
         </header>
 
         <section>
-          <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, marginBottom: '20px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
+          <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {myCampaigns.map(camp => {
               const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
               return (
-                <div key={camp.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '20px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#f5f5f4', overflow: 'hidden', flexShrink: 0 }}>
+                <div key={camp.id} style={{ backgroundColor: 'white', padding: '10px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f5f5f4', overflow: 'hidden', flexShrink: 0 }}>
                       {camp.image_url && <img src={camp.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontWeight: '900', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
-                      <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
+                      <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
+                      <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
                     </div>
-                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#f5f5f4', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>📢</button>
+                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#f5f5f4', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>📢</button>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '8px 0', borderTop: '1px solid #fafafa', borderBottom: '1px solid #fafafa', textAlign: 'center' }}>
-                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '12px' }}>{camp.views || 0}</p><p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>VIEWS</p></div>
-                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '12px', color: '#059669' }}>{camp.orders?.length || 0}</p><p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>PEDIDOS</p></div>
-                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '12px' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>PAGOS</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '6px 0', borderTop: '1px solid #fafafa', borderBottom: '1px solid #fafafa', textAlign: 'center' }}>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{camp.views || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>VIEWS</p></div>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#059669' }}>{camp.orders?.length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PEDIDOS</p></div>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PAGOS</p></div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '9px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR</button>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR</button>
                     {isExpired ? (
-                      <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '9px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
+                      <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
                     ) : (
-                      <button onClick={() => handleEndCampaign(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: '10px', fontSize: '9px', fontWeight: '900', cursor: 'pointer' }}>ENCERRAR</button>
+                      <button onClick={() => handleEndCampaign(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#fef2f2', color: '#ef4444', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>ENCERRAR</button>
                     )}
                   </div>
                 </div>
@@ -187,8 +216,8 @@ export default function PortalCondominio() {
           </div>
         </section>
 
-        <footer style={{ textAlign: 'center', paddingTop: '30px', paddingBottom: '30px' }}>
-          <p style={{ fontSize: '8px', fontWeight: '900', color: '#d6d3d1', letterSpacing: '4px' }}>COMPRAZAP⚡LANAI</p>
+        <footer style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '20px' }}>
+          <p style={{ fontSize: '7px', fontWeight: '900', color: '#d6d3d1', letterSpacing: '3px' }}>COMPRAZAP⚡LANAI</p>
         </footer>
       </div>
     </div>
