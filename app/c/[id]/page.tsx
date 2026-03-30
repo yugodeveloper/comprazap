@@ -21,8 +21,9 @@ export default function LandingPageGourmetFinal() {
 
   const [buyerName, setBuyerName] = useState('')
   const [buyerApto, setBuyerApto] = useState('')
-  const [selectedType, setSelectedType] = useState<any>(null) 
-  const [quantity, setQuantity] = useState(1)
+  
+  // NOVA LÓGICA: Objeto que guarda { "Nome da Cuca": quantidade }
+  const [cart, setCart] = useState<Record<string, number>>({})
 
   const containerStyle: React.CSSProperties = {
     maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', 
@@ -45,24 +46,40 @@ export default function LandingPageGourmetFinal() {
     const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
     
     if (pd && pd.variations) {
-      // Tipagem explícita de 'v' como string para o build passar
       if (typeof pd.variations === 'string') {
-        const legacyVars = pd.variations.split(',').map((v: string) => ({
+        pd.variations = pd.variations.split(',').map((v: string) => ({
           name: v.trim(),
           price: pd.price || 0
         }));
-        pd.variations = legacyVars;
       }
     } else if (pd) {
       pd.variations = [{ name: pd.name, price: pd.price || 0 }];
     }
-    
     setProduct(pd);
 
     const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
     setSeller(sl);
     setLoading(false);
   }
+
+  // Função para alterar quantidade no carrinho
+  const updateCart = (itemName: string, delta: number) => {
+    setCart(prev => {
+      const currentQty = prev[itemName] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      return { ...prev, [itemName]: newQty };
+    });
+  };
+
+  // Cálculo do Total Geral
+  const calculateTotal = () => {
+    if (!product?.variations) return 0;
+    return product.variations.reduce((acc: number, v: any) => {
+      return acc + (v.price * (cart[v.name] || 0));
+    }, 0);
+  };
+
+  const totalGeral = calculateTotal();
 
   const verificarIdentidade = async () => {
     if (contact.length < 10) return alert("Digite um WhatsApp válido");
@@ -82,8 +99,10 @@ export default function LandingPageGourmetFinal() {
         setExistingOrder(pending);
         setBuyerName(pending.buyer_name);
         setBuyerApto(pending.buyer_apto);
-        setQuantity(pending.quantity);
-        setSelectedType(pending.selected_variations); 
+        // Se for o formato novo de carrinho (objeto), carrega. Se não, ignora.
+        if (pending.selected_variations && typeof pending.selected_variations === 'object') {
+          setCart(pending.selected_variations);
+        }
       }
       setPastOrders(paid);
     }
@@ -92,7 +111,7 @@ export default function LandingPageGourmetFinal() {
   };
 
   const handleSalvarReserva = async () => {
-    if (!selectedType) return alert("Selecione uma opção");
+    if (totalGeral === 0) return alert("Selecione pelo menos um item");
     setLoading(true);
     
     const orderData = {
@@ -101,8 +120,8 @@ export default function LandingPageGourmetFinal() {
       buyer_contact: contact,
       buyer_name: buyerName,
       buyer_apto: buyerApto,
-      quantity,
-      selected_variations: selectedType,
+      quantity: 1, // A quantidade agora é controlada dentro do objeto 'cart'
+      selected_variations: cart, // Enviamos o objeto { "Cuca": 2, ... }
       status: 'pending'
     };
 
@@ -115,7 +134,7 @@ export default function LandingPageGourmetFinal() {
 
     if (res.data) {
       setExistingOrder(res.data);
-      alert("Reserva salva com sucesso! 🚀");
+      alert("Pedido atualizado com sucesso! 🚀");
     }
     setLoading(false);
   };
@@ -126,6 +145,7 @@ export default function LandingPageGourmetFinal() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
+        {/* HEADER */}
         <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
           <img src={campaign?.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Capa" />
           <div style={{ position: 'absolute', bottom: 15, left: 15, right: 15, background: 'rgba(255,255,255,0.8)', padding: 15, borderRadius: 20, backdropFilter: 'blur(5px)' }}>
@@ -135,31 +155,56 @@ export default function LandingPageGourmetFinal() {
         </div>
 
         <div style={{ padding: 25 }}>
-          <p style={{ color: '#444', fontSize: 14, marginBottom: 20 }}>{campaign?.description}</p>
+          <p style={{ color: '#444', fontSize: 14, marginBottom: 25 }}>{campaign?.description}</p>
 
+          {/* LISTA DE ITENS COM CONTROLE DE QUANTIDADE */}
           <div style={{ marginBottom: 25 }}>
-            <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase', marginBottom: 10 }}>Opções Disponíveis:</h3>
+            <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase', marginBottom: 15 }}>Escolha seus itens:</h3>
             
-            {product && Array.isArray(product.variations) ? product.variations.map((v: any, index: number) => (
+            {product?.variations?.map((v: any, index: number) => (
               <div 
                 key={index} 
-                onClick={() => (!existingOrder || existingOrder.status !== 'paid') && setSelectedType(v)}
                 style={{ 
-                  display: 'flex', justifyContent: 'space-between', padding: 15, borderRadius: 15, border: '1px solid #eee', 
-                  marginBottom: 8, cursor: 'pointer',
-                  backgroundColor: selectedType?.name === v.name ? '#f0fdf4' : 'white',
-                  borderColor: selectedType?.name === v.name ? '#059669' : '#eee'
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                  padding: '15px 0', borderBottom: '1px solid #f1f1f1'
                 }}
               >
-                <span style={{ fontWeight: 'bold', fontSize: 13 }}>{v.name}</span>
-                <span style={{ fontWeight: 900, color: '#059669' }}>R$ {v.price}</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: 'bold', fontSize: 14 }}>{v.name}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: '#059669', fontWeight: '900' }}>R$ {v.price}</p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button 
+                    onClick={() => updateCart(v.name, -1)}
+                    style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', backgroundColor: 'white', fontWeight: 'bold' }}
+                  > - </button>
+                  
+                  <span style={{ fontWeight: 900, fontSize: 16, minWidth: '20px', textAlign: 'center' }}>
+                    {cart[v.name] || 0}
+                  </span>
+
+                  <button 
+                    onClick={() => updateCart(v.name, 1)}
+                    style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', backgroundColor: 'white', fontWeight: 'bold' }}
+                  > + </button>
+                </div>
               </div>
-            )) : <p style={{fontSize: 10, color: '#999'}}>Nenhuma opção disponível.</p>}
+            ))}
           </div>
 
+          {/* TOTALIZADOR FIXO */}
+          {totalGeral > 0 && (
+            <div style={{ backgroundColor: '#f0fdf4', padding: 15, borderRadius: 15, marginBottom: 20, border: '1px solid #dcfce7', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 'bold', fontSize: 12, color: '#166534' }}>TOTAL DO PEDIDO</span>
+              <span style={{ fontWeight: '900', fontSize: 16, color: '#166534' }}>R$ {totalGeral.toFixed(2)}</span>
+            </div>
+          )}
+
+          {/* IDENTIFICAÇÃO */}
           {!identified ? (
             <div style={{ textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-              <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Identifique-se com seu WhatsApp:</p>
+              <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Identifique-se com seu WhatsApp para confirmar:</p>
               <input 
                 type="tel" placeholder="(00) 00000-0000" 
                 style={{ width: '100%', padding: 15, borderRadius: 15, border: '1px solid #ddd', textAlign: 'center', boxSizing: 'border-box' }}
@@ -169,39 +214,21 @@ export default function LandingPageGourmetFinal() {
             </div>
           ) : (
             <div>
-              <div style={{ opacity: existingOrder?.status === 'paid' ? 0.6 : 1, pointerEvents: existingOrder?.status === 'paid' ? 'none' : 'auto' }}>
+              <div style={{ opacity: existingOrder?.status === 'paid' ? 0.6 : 1 }}>
                 <input placeholder="Seu Nome" style={{ width: '100%', padding: 12, marginBottom: 10, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
                 <input placeholder="Apto" style={{ width: '100%', padding: 12, marginBottom: 10, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
-                
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, margin: '15px 0' }}>
-                   <button onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd' }}>-</button>
-                   <span style={{ fontWeight: 900 }}>{quantity}</span>
-                   <button onClick={() => setQuantity(q => q + 1)} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd' }}>+</button>
-                </div>
 
                 <button onClick={handleSalvarReserva} style={btnStyle}>
-                  {existingOrder ? 'ALTERAR E CONFIRMAR' : 'CONFIRMAR RESERVA'}
+                  {existingOrder ? 'ALTERAR PEDIDO' : 'CONFIRMAR PEDIDO'}
                 </button>
               </div>
 
+              {/* PIX */}
               {existingOrder && (
                 <div style={{ marginTop: 30, padding: 20, backgroundColor: '#f8fafc', borderRadius: 25, border: '2px dashed #cbd5e1', textAlign: 'center' }}>
                    <p style={{ fontWeight: 900, fontSize: 14 }}>PAGAMENTO PIX</p>
                    <QRCodeSVG value={campaign?.pix_key || ''} size={150} style={{ margin: '15px 0' }} />
-                   <p style={{ fontSize: 18, fontWeight: 900, color: '#059669' }}>Total: R$ {((selectedType?.price || 0) * quantity).toFixed(2)}</p>
-                </div>
-              )}
-
-              {pastOrders.length > 0 && (
-                <div style={{ marginTop: 40, borderTop: '1px solid #eee', paddingTop: 20 }}>
-                   <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase' }}>Compras Realizadas ✅</h3>
-                   {pastOrders.map((o: any, i: number) => (
-                     <div key={i} style={{ fontSize: 11, padding: '12px 0', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{new Date(o.created_at).toLocaleDateString()} - {o.quantity}x {o.selected_variations?.name}</span>
-                        <span style={{ color: '#059669', fontWeight: 'bold' }}>PAGO</span>
-                     </div>
-                   ))}
-                   <button onClick={() => { setExistingOrder(null); setBuyerName(''); setBuyerApto(''); setQuantity(1); setSelectedType(null); }} style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', background: 'none', border: 'none', marginTop: 15, cursor: 'pointer' }}>+ FAZER NOVA COMPRA</button>
+                   <p style={{ fontSize: 20, fontWeight: 900, color: '#059669' }}>R$ {totalGeral.toFixed(2)}</p>
                 </div>
               )}
             </div>
