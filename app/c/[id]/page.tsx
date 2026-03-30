@@ -202,6 +202,7 @@ export default function LandingPageGourmetFinal() {
           {/* OVERLAY GLASS NO TÍTULO */}
           <div className="absolute bottom-4 left-4 right-4 bg-white/60 backdrop-blur-lg p-5 rounded-2xl border border-white/20 shadow-xl">
             <h1 className="text-2xl font-black text-stone-950 leading-tight italic tracking-tighter">{campaign?.title}</h1>
+            <h1 className="... text-emerald-500">CompraZap EMERALD V2 ⚡</h1>
             <div className="flex items-center gap-2 mt-2">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-stone-700 text-[10px] font-bold uppercase tracking-[0.2em]">Oferta de: {seller?.full_name}</span>
