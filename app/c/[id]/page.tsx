@@ -26,7 +26,6 @@ export default function LandingPageGourmetFinal() {
   const [uploading, setUploading] = useState(false)
   const [currentReceipt, setCurrentReceipt] = useState<string | null>(null)
 
-  // Estilo padrão para todos os inputs (Garante que não vaze para a direita)
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '18px',
@@ -35,11 +34,12 @@ export default function LandingPageGourmetFinal() {
     marginBottom: '15px',
     textAlign: 'center',
     outline: 'none',
-    boxSizing: 'border-box', // Crucial para não vazar
+    boxSizing: 'border-box',
     fontSize: '16px',
     fontFamily: 'inherit'
   };
 
+  // --- 1. SESSÃO E RECUPERAÇÃO ---
   useEffect(() => {
     if (!id) return;
     const handleViewCount = async () => {
@@ -101,12 +101,47 @@ export default function LandingPageGourmetFinal() {
     return () => { supabase.removeChannel(subscription) };
   }, [orderId]);
 
+  // --- 2. FUNÇÕES TELEGRAM (RESTAURADAS) ---
+  const enviarNotificacaoTelegram = async (order: any) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    const mensagem = `💰 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Produto:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Qtd:* ${order.quantity}x\n💵 *Total:* R$ ${(product.price * order.quantity).toFixed(2)}\n--------------------------------\n📱 *Contato:* ${order.buyer_contact}`;
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' })
+      });
+    } catch (err) { console.error("Erro Telegram:", err); }
+  };
+
+  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId, photo: imageUrl,
+        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n\nAceita este pagamento?`,
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
+      })
+    });
+  };
+
+  // --- 3. HANDLERS ---
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
     const orderData = { campaign_id: id, product_id: product?.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, status: 'pending', selected_variations: selectedVariations, quantity: quantity }
     const { data } = await supabase.from('orders').insert(orderData).select().single()
     if (data) {
-      setOrderId(data.id); localStorage.setItem(`order_${id}`, data.id); setStep('checkout');
+      setOrderId(data.id); 
+      localStorage.setItem(`order_${id}`, data.id); 
+      setStep('checkout');
+      await enviarNotificacaoTelegram(data); // ALERTA 1: Pedido realizado
     }
     setLoading(false);
   }
@@ -121,6 +156,7 @@ export default function LandingPageGourmetFinal() {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
       await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', orderId)
       setCurrentReceipt(publicUrl)
+      await enviarComprovanteTelegram(publicUrl, buyerName, orderId); // ALERTA 2: Comprovante enviado
     }
     setUploading(false)
   }
