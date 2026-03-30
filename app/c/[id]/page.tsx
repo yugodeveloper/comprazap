@@ -26,6 +26,20 @@ export default function LandingPageGourmetFinal() {
   const [uploading, setUploading] = useState(false)
   const [currentReceipt, setCurrentReceipt] = useState<string | null>(null)
 
+  // Estilo padrão para todos os inputs (Garante que não vaze para a direita)
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '18px',
+    borderRadius: '15px',
+    border: '1px solid #e7e5e4',
+    marginBottom: '15px',
+    textAlign: 'center',
+    outline: 'none',
+    boxSizing: 'border-box', // Crucial para não vazar
+    fontSize: '16px',
+    fontFamily: 'inherit'
+  };
+
   useEffect(() => {
     if (!id) return;
     const handleViewCount = async () => {
@@ -115,9 +129,8 @@ export default function LandingPageGourmetFinal() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', color: '#1c1917', paddingBottom: '80px', fontFamily: 'sans-serif' }}>
-      <div style={{ maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+      <div style={{ maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
         
-        {/* IMAGEM COM TAMANHO TRAVADO VIA STYLE INLINE */}
         <div style={{ position: 'relative', width: '100%', height: '250px', backgroundColor: '#f5f5f4', overflow: 'hidden' }}>
           {campaign?.image_url ? (
             <img 
@@ -142,11 +155,14 @@ export default function LandingPageGourmetFinal() {
 
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '900', fontStyle: 'italic', marginBottom: '10px' }}>Olá, Vizinho!</h2>
+              <h2 style={{ fontSize: '20px', fontWeight: '900', fontStyle: 'italic', marginBottom: '5px' }}>Olá, Vizinho!</h2>
+              <p style={{ fontSize: '11px', color: '#78716c', marginBottom: '20px', fontWeight: 'bold', textTransform: 'uppercase' }}>Identifique-se com seu WhatsApp</p>
               <input 
-                type="text" placeholder="WhatsApp ou E-mail" 
-                style={{ width: '100%', padding: '20px', borderRadius: '15px', border: '1px solid #e7e5e4', marginBottom: '20px', textAlign: 'center', outline: 'none' }}
-                value={contact} onChange={e => setContact(e.target.value)}
+                type="tel" 
+                placeholder="(00) 00000-0000" 
+                style={inputStyle}
+                value={contact} 
+                onChange={e => setContact(e.target.value)}
               />
               <button onClick={() => setStep('reserva')} style={{ width: '100%', padding: '20px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', fontSize: '12px', letterSpacing: '1px' }}>
                 VER PRODUTO E RESERVAR
@@ -182,8 +198,10 @@ export default function LandingPageGourmetFinal() {
                 </div>
               </div>
 
-              <input placeholder="Seu Nome" required style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #e7e5e4' }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-              <input placeholder="Apto" required style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #e7e5e4' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <input placeholder="Seu Nome Completo" required style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+                <input placeholder="Apto / Bloco" required style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              </div>
 
               <button type="submit" style={{ width: '100%', padding: '20px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
                 CONFIRMAR R$ {((product?.price || 0) * quantity).toFixed(2)}
