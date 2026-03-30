@@ -22,7 +22,7 @@ export default function LandingPageGourmetFinal() {
   const [itemsList, setItemsList] = useState<any[]>([])
   const [existingOrder, setExistingOrder] = useState<any>(null)
   const [orderStatus, setOrderStatus] = useState<string>('pending')
-  const [pastOrders, setPastOrders] = useState<any[]>([]) // Lista de pedidos pagos
+  const [pastOrders, setPastOrders] = useState<any[]>([])
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
@@ -55,34 +55,43 @@ export default function LandingPageGourmetFinal() {
 
   const totalGeral = itemsList.reduce((acc, curr) => acc + curr.total, 0);
 
+  // --- 🚀 LÓGICA TELEGRAM RESTAURADA ---
+  const enviarNotificacaoTelegram = async (order: any) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    const itensMsg = itemsList.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${totalGeral.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' }) });
+    } catch (err) { console.error(err); }
+  };
+
+  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${totalGeral.toFixed(2)}\n\nAceita este pagamento?`, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] } }) });
+    } catch (err) { console.error(err); }
+  };
+
   const handleIdentificacao = async () => {
     if (contact.length < 10) return alert("WhatsApp inválido");
     setLoading(true);
-    
-    // Busca pedidos desta campanha para este contato
     const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', contact).order('created_at', { ascending: false });
-    
-    // Busca o último endereço global para facilitar a vida do morador
     const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', contact).order('created_at', { ascending: false }).limit(1).maybeSingle();
 
     if (orders && orders.length > 0) {
       const pending = orders.find((o: any) => o.status !== 'paid');
-      const paidOnes = orders.filter((o: any) => o.status === 'paid');
-      
-      setPastOrders(paidOnes);
-
+      setPastOrders(orders.filter((o: any) => o.status === 'paid'));
       if (pending) {
         setExistingOrder(pending);
         setOrderStatus(pending.status);
         if (itemsList.length === 0 && Array.isArray(pending.selected_variations)) setItemsList(pending.selected_variations);
       }
     }
-
-    if (lastGlobalOrder) { 
-      setBuyerName(lastGlobalOrder.buyer_name || ''); 
-      setBuyerApto(lastGlobalOrder.buyer_apto || ''); 
-    }
-    
+    if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
     setStep('dados');
     setLoading(false);
   };
@@ -103,16 +112,28 @@ export default function LandingPageGourmetFinal() {
     
     setExistingOrder(savedOrder);
     setOrderStatus(savedOrder.status);
+    await enviarNotificacaoTelegram(savedOrder);
     setStep('concluido');
     setLoading(false);
   };
 
-  const handleNewOrder = () => {
-    setExistingOrder(null);
-    setOrderStatus('pending');
-    setItemsList([]);
-    setStep('itens');
+  const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !existingOrder) return;
+    setUploading(true);
+    const file = e.target.files[0];
+    const fileName = `receipts/${existingOrder.id}-${Date.now()}`;
+    const { error: upErr } = await supabase.storage.from('comprovantes').upload(fileName, file);
+    if (!upErr) {
+      const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
+      await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
+      setOrderStatus('pending');
+      await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id);
+      alert("Comprovante enviado!");
+    }
+    setUploading(false);
   };
+
+  const handleNewOrder = () => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); };
 
   if (loading) return <div style={{textAlign:'center', marginTop:50, fontWeight:'bold', color: '#059669'}}>Lanai Loading...</div>
 
@@ -132,7 +153,7 @@ export default function LandingPageGourmetFinal() {
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
-                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU NOVO PEDIDO</p>
+                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {product?.variations?.map((v: any, index: number) => (
                     <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '12px 18px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '13px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>{v.name}<br/><span style={{fontSize: 10}}>R$ {v.price}</span></button>
@@ -145,7 +166,6 @@ export default function LandingPageGourmetFinal() {
                 </div>
                 <button onClick={() => { if (!tempSelection) return alert("Selecione um item!"); setItemsList([...itemsList, { id: Date.now(), name: tempSelection.name, price: tempSelection.price, qty: tempQty, total: tempSelection.price * tempQty }]); setTempQty(1); setTempSelection(null); }} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>ADICIONAR À LISTA</button>
               </div>
-
               {itemsList.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: 20, borderRadius: 25 }}>
                   <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>LISTA ATUAL</p>
@@ -174,8 +194,6 @@ export default function LandingPageGourmetFinal() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR RESERVA</button>
-
-              {/* LISTA DE PEDIDOS JÁ CONCLUÍDOS */}
               {pastOrders.length > 0 && (
                 <div style={{ marginTop: 40, textAlign: 'left', borderTop: '1px solid #eee', paddingTop: 20 }}>
                   <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 15 }}>Meus Pedidos Pagos ✅</p>
@@ -216,14 +234,14 @@ export default function LandingPageGourmetFinal() {
                 <>
                   <div style={{ marginBottom: 25 }}>
                     <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Anexe o comprovante Pix:</p>
-                    <input type="file" accept="image/*" disabled={uploading} style={{ fontSize: 12 }} />
+                    <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} style={{ fontSize: 12 }} />
+                    {uploading && <p style={{fontSize:10, color:'#059669', marginTop:5}}>Enviando...</p>}
                   </div>
                   <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR PEDIDO</button>
                 </>
               )}
             </div>
           )}
-
         </div>
       </div>
     </div>
