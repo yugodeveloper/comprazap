@@ -1,194 +1,177 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function NovaCampanha() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  
+  // Campos Principais
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [pixKey, setPixKey] = useState('')
-  const [price, setPrice] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const router = useRouter()
+  const [maxSales, setMaxSales] = useState('20')
+  const [imageUrl, setImageUrl] = useState('')
 
-  // --- PERSISTÊNCIA DE LOGIN ---
-  useEffect(() => {
-    const savedId = localStorage.getItem('user_id')
-    if (!savedId) {
-      alert("Sessão expirada. Por favor, entre novamente.")
-      router.push('/')
-      return
-    }
-    setUserId(savedId)
-  }, [router])
+  // LISTA DINÂMICA DE TIPOS E PREÇOS
+  const [variations, setVariations] = useState([{ name: '', price: '' }])
 
-  // --- UPLOAD DE IMAGEM ---
-  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      if (!e.target.files || e.target.files.length === 0) return
-      setUploading(true)
-      const file = e.target.files[0]
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${userId}-${Math.random()}.${fileExt}`
-      const filePath = `campaign-images/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('comprovantes') 
-        .upload(filePath, file)
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('comprovantes')
-        .getPublicUrl(filePath)
-
-      setImageUrl(publicUrl)
-    } catch (error: any) {
-      alert('Erro ao subir imagem: ' + error.message)
-    } finally {
-      setUploading(false)
-    }
+  const addVariation = () => {
+    setVariations([...variations, { name: '', price: '' }])
   }
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!userId) return
+  const removeVariation = (index: number) => {
+    const newVars = variations.filter((_, i) => i !== index)
+    setVariations(newVars)
+  }
 
+  const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
+    const newVars = [...variations]
+    newVars[index][field] = value
+    setVariations(newVars)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLoading(true)
+
     try {
+      const userId = localStorage.getItem('user_id')
+      if (!userId) throw new Error("Usuário não logado")
+
       // 1. Criar a Campanha
-      const { data: campaign, error: cpError } = await supabase
+      const { data: camp, error: campErr } = await supabase
         .from('campaigns')
         .insert({
           title,
           description,
           pix_key: pixKey,
+          expires_at: expiresAt,
+          max_sales: parseInt(maxSales),
           image_url: imageUrl,
-          expires_at: expiresAt, // Campo de validade
           creator_id: userId,
-          location: 'Lanai', // Garante que não dê erro de null constraint
           status: 'active'
         })
         .select()
         .single()
 
-      if (cpError) throw cpError
+      if (campErr) throw campErr
 
-      // 2. Criar o Produto padrão
-      const { error: pdError } = await supabase
+      // 2. Criar o Produto vinculado com as variações (JSON)
+      // Transformamos os preços em números antes de salvar
+      const formattedVariations = variations.map(v => ({
+        name: v.name,
+        price: parseFloat(v.price.replace(',', '.'))
+      }))
+
+      const { error: prodErr } = await supabase
         .from('products')
         .insert({
-          campaign_id: campaign.id,
-          name: title, // Usando o título da campanha como nome do produto
-          price: parseFloat(price.replace(',', '.')),
-          variations: { "Opção": ["Padrão"] }
+          campaign_id: camp.id,
+          name: title,
+          price: formattedVariations[0].price, // Preço base (mínimo)
+          variations: formattedVariations 
         })
 
-      if (pdError) throw pdError
+      if (prodErr) throw prodErr
 
-      alert("🚀 Campanha lançada com sucesso!")
+      alert("Campanha lançada com sucesso! 🚀")
       router.push('/')
     } catch (err: any) {
-      alert("Erro ao criar campanha: " + err.message)
+      alert("Erro ao criar: " + err.message)
     } finally {
       setLoading(false)
     }
   }
 
+  const inputStyle = "w-full p-4 bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none font-medium text-sm transition-all";
+
   return (
-    <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center font-sans text-slate-900">
-      <div className="w-full max-w-md bg-white rounded-[40px] p-8 shadow-2xl border border-slate-100">
+    <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
+      <div className="max-w-md mx-auto space-y-8">
         
-        <header className="mb-6">
-          <button onClick={() => router.push('/')} className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">← Voltar</button>
-          <h1 className="text-3xl font-black italic tracking-tighter">Lançar Campanha ⚡</h1>
+        <header className="flex items-center gap-4">
+          <button onClick={() => router.back()} className="text-2xl">←</button>
+          <h1 className="text-xl font-black italic">Nova Campanha ⚡</h1>
         </header>
 
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* FOTO */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Foto do Produto</label>
-            <div className="relative h-40 w-full bg-slate-100 rounded-3xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
-              {imageUrl ? (
-                <img src={imageUrl} alt="Preview" className="h-full w-full object-cover" />
-              ) : (
-                <div className="text-center">
-                   <p className="text-2xl">📸</p>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase">Toque para enviar</p>
-                </div>
-              )}
-              <input 
-                type="file" accept="image/*" onChange={handleUploadImage}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-              />
-              {uploading && (
-                <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                  <p className="animate-pulse text-[10px] font-black text-blue-600">SUBINDO...</p>
-                </div>
-              )}
+          {/* INFORMAÇÕES BÁSICAS */}
+          <section className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">O que você vai vender?</p>
+            <input placeholder="Título (ex: Cuca da Vavá)" required className={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
+            <textarea placeholder="Descrição (detalhes do produto...)" required className={`${inputStyle} h-32 resize-none`} value={description} onChange={e => setDescription(e.target.value)} />
+            <input placeholder="URL da Imagem do Produto" className={inputStyle} value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
+          </section>
+
+          {/* TIPOS E PREÇOS DINÂMICOS */}
+          <section className="space-y-4 bg-white p-6 rounded-[30px] border border-slate-100">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tipos e Valores</p>
+            
+            {variations.map((v, index) => (
+              <div key={index} className="flex gap-2 items-center animate-in slide-in-from-left duration-300">
+                <input 
+                  placeholder="Nome (ex: G de Maçã)" 
+                  required 
+                  className="flex-1 p-3 bg-slate-50 rounded-xl text-xs border-none outline-none"
+                  value={v.name}
+                  onChange={(e) => updateVariation(index, 'name', e.target.value)}
+                />
+                <input 
+                  placeholder="Preço R$" 
+                  type="text"
+                  required 
+                  className="w-20 p-3 bg-slate-50 rounded-xl text-xs border-none outline-none font-bold text-emerald-600"
+                  value={v.price}
+                  onChange={(e) => updateVariation(index, 'price', e.target.value)}
+                />
+                {variations.length > 1 && (
+                  <button type="button" onClick={() => removeVariation(index)} className="text-red-400 p-2">✕</button>
+                )}
+              </div>
+            ))}
+            
+            <button 
+              type="button" 
+              onClick={addVariation}
+              className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase hover:bg-slate-50"
+            >
+              + Adicionar Opção
+            </button>
+          </section>
+
+          {/* REGRAS E PAGAMENTO */}
+          <section className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Configurações</p>
+            
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">Data de Fim</label>
+                <input type="date" required className={inputStyle} value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+              </div>
+              <div className="w-1/3">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">Limite Un.</label>
+                <input type="number" required className={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Título da Campanha</label>
-            <input 
-              placeholder="Ex: Cuca de Banana" required 
-              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
-              value={title} onChange={e => setTitle(e.target.value)} 
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descrição</label>
-            <textarea 
-              placeholder="Detalhes sobre o produto, entrega ou encomendas..." 
-              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none h-20 resize-none border-2 border-transparent focus:border-slate-900 transition-all"
-              value={description} onChange={e => setDescription(e.target.value)} 
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Preço Unitário (R$)</label>
-              <input 
-                type="text" placeholder="25,00" required 
-                className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
-                value={price} onChange={e => setPrice(e.target.value)} 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Expira em</label>
-              <input 
-                type="date" required 
-                className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
-                value={expiresAt} onChange={e => setExpiresAt(e.target.value)} 
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Chave PIX para Recebimento</label>
-            <input 
-              placeholder="CPF, E-mail ou Celular" required 
-              className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-slate-900 transition-all"
-              value={pixKey} onChange={e => setPixKey(e.target.value)} 
-            />
-          </div>
+            <input placeholder="Sua Chave Pix para Receber" required className={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
+          </section>
 
           <button 
-            type="submit" disabled={loading || uploading}
-            className="w-full bg-slate-900 text-white py-6 rounded-[30px] font-black text-xl shadow-2xl active:scale-95 transition-all mt-4 disabled:bg-slate-300"
+            type="submit" 
+            disabled={loading}
+            className="w-full py-6 bg-emerald-600 text-white rounded-[30px] font-black text-lg shadow-xl shadow-emerald-100 active:scale-95 transition-all disabled:opacity-50"
           >
-            {loading ? 'PUBLICANDO...' : 'LANÇAR NO CONDOMÍNIO'}
+            {loading ? 'LANÇANDO...' : 'LANÇAR CAMPANHA 🚀'}
           </button>
+
         </form>
       </div>
-      <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">CompraZap⚡ Lanai</p>
     </div>
   )
 }

@@ -8,270 +8,201 @@ import { QRCodeSVG } from 'qrcode.react'
 export default function LandingPageGourmetFinal() {
   const params = useParams()
   const id = params?.id as string
-  const router = useRouter()
   
   const [campaign, setCampaign] = useState<any>(null)
   const [product, setProduct] = useState<any>(null)
   const [seller, setSeller] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [orderStatus, setOrderStatus] = useState<string>('pending')
-
-  const [step, setStep] = useState<'identificacao' | 'reserva' | 'checkout'>('identificacao')
+  
+  // Estados de Fluxo
   const [contact, setContact] = useState('')
+  const [identified, setIdentified] = useState(false)
+  const [existingOrder, setExistingOrder] = useState<any>(null)
+  const [pastOrders, setPastOrders] = useState<any[]>([])
+
+  // Campos do Formulário
   const [buyerName, setBuyerName] = useState('')
   const [buyerApto, setBuyerApto] = useState('')
-  const [orderId, setOrderId] = useState<string | null>(null)
-  const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({})
+  const [selectedType, setSelectedType] = useState<any>(null) // {name, price}
   const [quantity, setQuantity] = useState(1)
   const [uploading, setUploading] = useState(false)
-  const [currentReceipt, setCurrentReceipt] = useState<string | null>(null)
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '18px',
-    borderRadius: '15px',
-    border: '1px solid #e7e5e4',
-    marginBottom: '15px',
-    textAlign: 'center',
-    outline: 'none',
-    boxSizing: 'border-box',
-    fontSize: '16px',
-    fontFamily: 'inherit'
+  const containerStyle: React.CSSProperties = {
+    maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', 
+    boxShadow: '0 10px 15px rgba(0,0,0,0.1)', fontFamily: 'sans-serif', paddingBottom: '50px'
   };
 
-  // --- 1. SESSÃO E RECUPERAÇÃO ---
-  useEffect(() => {
-    if (!id) return;
-    const handleViewCount = async () => {
-      try {
-        const viewKey = `viewed_${id}`;
-        if (!localStorage.getItem(viewKey)) {
-          await supabase.rpc('increment_campaign_views', { row_id: id });
-          localStorage.setItem(viewKey, 'true');
-        }
-      } catch (e) { console.error(e); }
-    };
-    handleViewCount();
+  const btnStyle: React.CSSProperties = {
+    width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669',
+    color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px'
+  };
 
-    const savedOrderId = localStorage.getItem(`order_${id}`);
-    if (savedOrderId) {
-      setOrderId(savedOrderId);
-      setStep('checkout');
-      supabase.from('orders').select('status, receipt_url, buyer_name').eq('id', savedOrderId).single().then(({ data }) => {
-        if (data) {
-          setOrderStatus(data.status);
-          if (data.status === 'paid') setCurrentReceipt('confirmed');
-          else if (data.receipt_url) setCurrentReceipt(data.receipt_url);
-          if (data.buyer_name) setBuyerName(data.buyer_name);
-        }
-      });
-    }
+  useEffect(() => {
+    if (id) fetchData();
   }, [id]);
 
-  useEffect(() => {
-    if (!id) return
-    const fetchData = async () => {
-      try {
-        const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single()
-        if (!cp) return
-        setCampaign(cp)
-        const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single()
-        setProduct(pd)
-        const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp.creator_id).single()
-        setSeller(sl)
-        if (pd?.variations) {
-          const defaults: any = {}
-          Object.keys(pd.variations).forEach(key => {
-            if (pd.variations[key]?.length > 0) defaults[key] = pd.variations[key][0]
-          })
-          setSelectedVariations(defaults)
-        }
-      } finally { setLoading(false) }
-    }
-    fetchData()
-  }, [id])
-
-  useEffect(() => {
-    if (!orderId) return;
-    const subscription = supabase.channel(`status-${orderId}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
-      setOrderStatus(payload.new.status);
-      if (payload.new.status === 'paid') setCurrentReceipt('confirmed');
-      if (payload.new.status === 'rejected') setCurrentReceipt(null);
-    }).subscribe();
-    return () => { supabase.removeChannel(subscription) };
-  }, [orderId]);
-
-  // --- 2. FUNÇÕES TELEGRAM (RESTAURADAS) ---
-  const enviarNotificacaoTelegram = async (order: any) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    const mensagem = `💰 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Produto:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Qtd:* ${order.quantity}x\n💵 *Total:* R$ ${(product.price * order.quantity).toFixed(2)}\n--------------------------------\n📱 *Contato:* ${order.buyer_contact}`;
-    try {
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' })
-      });
-    } catch (err) { console.error("Erro Telegram:", err); }
-  };
-
-  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId, photo: imageUrl,
-        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n\nAceita este pagamento?`,
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
-      })
-    });
-  };
-
-  // --- 3. HANDLERS ---
-  const handleOrder = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true);
-    const orderData = { campaign_id: id, product_id: product?.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, status: 'pending', selected_variations: selectedVariations, quantity: quantity }
-    const { data } = await supabase.from('orders').insert(orderData).select().single()
-    if (data) {
-      setOrderId(data.id); 
-      localStorage.setItem(`order_${id}`, data.id); 
-      setStep('checkout');
-      await enviarNotificacaoTelegram(data); // ALERTA 1: Pedido realizado
-    }
+  async function fetchData() {
+    const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single();
+    setCampaign(cp);
+    const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
+    setProduct(pd);
+    const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
+    setSeller(sl);
     setLoading(false);
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !orderId) return
-    setUploading(true)
-    const file = e.target.files[0]
-    const fileName = `receipts/${orderId}-${Date.now()}`
-    const { error: upErr } = await supabase.storage.from('comprovantes').upload(fileName, file)
-    if (!upErr) {
-      const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
-      await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', orderId)
-      setCurrentReceipt(publicUrl)
-      await enviarComprovanteTelegram(publicUrl, buyerName, orderId); // ALERTA 2: Comprovante enviado
-    }
-    setUploading(false)
-  }
+  // --- BUSCA COMPRA POR WHATSAPP ---
+  const verificarIdentidade = async () => {
+    if (contact.length < 10) return alert("Digite um WhatsApp válido");
+    setLoading(true);
 
-  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontWeight: 'bold', color: '#059669' }}>Lanai Loading...</div>
+    // Busca compras já feitas (Histórico)
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('campaign_id', id)
+      .eq('buyer_contact', contact);
+
+    if (orders && orders.length > 0) {
+      const pending = orders.find(o => o.status !== 'paid');
+      const paid = orders.filter(o => o.status === 'paid');
+      
+      if (pending) {
+        setExistingOrder(pending);
+        setBuyerName(pending.buyer_name);
+        setBuyerApto(pending.buyer_apto);
+        setQuantity(pending.quantity);
+        setSelectedType(pending.selected_variations); // Agora guarda o objeto {name, price}
+      }
+      setPastOrders(paid);
+    }
+    setIdentified(true);
+    setLoading(false);
+  };
+
+  const handleSalvarReserva = async () => {
+    if (!selectedType) return alert("Selecione uma opção");
+    setLoading(true);
+    
+    const orderData = {
+      campaign_id: id,
+      product_id: product.id,
+      buyer_contact: contact,
+      buyer_name: buyerName,
+      buyer_apto: buyerApto,
+      quantity,
+      selected_variations: selectedType,
+      status: 'pending'
+    };
+
+    let res;
+    if (existingOrder) {
+      res = await supabase.from('orders').update(orderData).eq('id', existingOrder.id).select().single();
+    } else {
+      res = await supabase.from('orders').insert(orderData).select().single();
+    }
+
+    if (res.data) {
+      setExistingOrder(res.data);
+      alert("Reserva salva com sucesso! Prossiga para o pagamento.");
+    }
+    setLoading(false);
+  };
+
+  if (loading) return <div style={{textAlign:'center', marginTop:'50px'}}>Carregando CompraZap...</div>
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', color: '#1c1917', paddingBottom: '80px', fontFamily: 'sans-serif' }}>
-      <div style={{ maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+    <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
+      <div style={containerStyle}>
         
-        <div style={{ position: 'relative', width: '100%', height: '250px', backgroundColor: '#f5f5f4', overflow: 'hidden' }}>
-          {campaign?.image_url ? (
-            <img 
-              src={campaign.image_url} 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-              alt="Capa" 
-            />
-          ) : (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px' }}>🖼️</div>
-          )}
-          
-          <div style={{ position: 'absolute', bottom: '15px', left: '15px', right: '15px', backgroundColor: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(10px)', padding: '20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.3)' }}>
-            <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '900', fontStyle: 'italic', color: '#0c0a09' }}>{campaign?.title}</h1>
-            <p style={{ margin: '5px 0 0 0', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: '#444' }}>Por: {seller?.full_name}</p>
+        {/* HEADER IMAGEM */}
+        <div style={{ position: 'relative', height: '250px', overflow: 'hidden' }}>
+          <img src={campaign?.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', bottom: 15, left: 15, right: 15, background: 'rgba(255,255,255,0.8)', padding: 15, borderRadius: 20, backdropFilter: 'blur(5px)' }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>{campaign?.title}</h1>
+            <p style={{ margin: 0, fontSize: 10, color: '#666' }}>FECHA EM: {new Date(campaign?.expires_at).toLocaleDateString()}</p>
           </div>
         </div>
 
-        <div style={{ padding: '30px' }}>
-          <div style={{ backgroundColor: '#f5f5f4', padding: '20px', borderRadius: '20px', marginBottom: '30px' }}>
-            <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#444' }}>{campaign?.description}</p>
+        <div style={{ padding: 25 }}>
+          <p style={{ color: '#444', fontSize: 14, marginBottom: 20 }}>{campaign?.description}</p>
+
+          {/* VITRINE DE PREÇOS (SEMPRE VISÍVEL) */}
+          <div style={{ marginBottom: 25 }}>
+            <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase', marginBottom: 10 }}>Opções Disponíveis</h3>
+            {product?.variations?.map((v: any, index: number) => (
+              <div 
+                key={index} 
+                onClick={() => !existingOrder?.status && setSelectedType(v)}
+                style={{ 
+                  display: 'flex', justifyContent: 'space-between', padding: 15, borderRadius: 15, border: '1px solid #eee', 
+                  marginBottom: 8, cursor: 'pointer',
+                  backgroundColor: selectedType?.name === v.name ? '#f0fdf4' : 'white',
+                  borderColor: selectedType?.name === v.name ? '#059669' : '#eee'
+                }}
+              >
+                <span style={{ fontWeight: 'bold', fontSize: 13 }}>{v.name}</span>
+                <span style={{ fontWeight: 900, color: '#059669' }}>R$ {v.price}</span>
+              </div>
+            ))}
           </div>
 
-          {step === 'identificacao' && (
-            <div style={{ textAlign: 'center' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '900', fontStyle: 'italic', marginBottom: '5px' }}>Olá, Vizinho!</h2>
-              <p style={{ fontSize: '11px', color: '#78716c', marginBottom: '20px', fontWeight: 'bold', textTransform: 'uppercase' }}>Identifique-se com seu WhatsApp</p>
+          {/* FLUXO DE IDENTIFICAÇÃO */}
+          {!identified ? (
+            <div style={{ textAlign: 'center', borderTop: '1px solid #eee', pt: 20 }}>
+              <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Para comprar ou ver seus pedidos, digite seu WhatsApp:</p>
               <input 
-                type="tel" 
-                placeholder="(00) 00000-0000" 
-                style={inputStyle}
-                value={contact} 
-                onChange={e => setContact(e.target.value)}
+                type="tel" placeholder="(00) 00000-0000" 
+                style={{ width: '100%', padding: 15, borderRadius: 15, border: '1px solid #ddd', textAlign: 'center', boxSizing: 'border-box' }}
+                value={contact} onChange={e => setContact(e.target.value)}
               />
-              <button onClick={() => setStep('reserva')} style={{ width: '100%', padding: '20px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', fontSize: '12px', letterSpacing: '1px' }}>
-                VER PRODUTO E RESERVAR
-              </button>
+              <button onClick={verificarIdentidade} style={btnStyle}>CONTINUAR</button>
             </div>
-          )}
-
-          {step === 'reserva' && (
-            <form onSubmit={handleOrder} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {product?.variations && Object.keys(product.variations).map(key => (
-                <div key={key}>
-                  <label style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', color: '#a8a29e', marginBottom: '10px', display: 'block' }}>{key}</label>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {product.variations[key].map((v: string) => (
-                      <button 
-                        key={v} type="button"
-                        onClick={() => setSelectedVariations({...selectedVariations, [key]: v})}
-                        style={{ padding: '12px 20px', borderRadius: '10px', border: '1px solid #e7e5e4', fontSize: '12px', fontWeight: 'bold', backgroundColor: selectedVariations[key] === v ? '#059669' : 'white', color: selectedVariations[key] === v ? 'white' : '#78716c' }}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
+          ) : (
+            <div className="animate-in fade-in transition-all">
+              {/* CAMPOS DE DADOS */}
+              <div style={{ opacity: existingOrder?.status === 'paid' ? 0.6 : 1, pointerEvents: existingOrder?.status === 'paid' ? 'none' : 'auto' }}>
+                <input placeholder="Seu Nome" style={{ width: '100%', padding: 12, marginBottom: 10, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+                <input placeholder="Apto" style={{ width: '100%', padding: 12, marginBottom: 10, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+                
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, margin: '15px 0' }}>
+                   <button onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd' }}>-</button>
+                   <span style={{ fontWeight: 900 }}>{quantity}</span>
+                   <button onClick={() => setQuantity(q => q + 1)} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd' }}>+</button>
                 </div>
-              ))}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', backgroundColor: '#f5f5f4', borderRadius: '15px' }}>
-                <span style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' }}>Quantidade</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} style={{ width: '35px', height: '35px', borderRadius: '50%', border: 'none', backgroundColor: 'white', fontWeight: 'bold', cursor: 'pointer' }}>-</button>
-                  <span style={{ fontWeight: '900', fontSize: '18px' }}>{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(q => q + 1)} style={{ width: '35px', height: '35px', borderRadius: '50%', border: 'none', backgroundColor: 'white', fontWeight: 'bold', cursor: 'pointer' }}>+</button>
-                </div>
+                <button onClick={handleSalvarReserva} style={btnStyle}>
+                  {existingOrder ? 'ALTERAR E CONFIRMAR' : 'CONFIRMAR RESERVA'}
+                </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <input placeholder="Seu Nome Completo" required style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-                <input placeholder="Apto / Bloco" required style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
-              </div>
-
-              <button type="submit" style={{ width: '100%', padding: '20px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
-                CONFIRMAR R$ {((product?.price || 0) * quantity).toFixed(2)}
-              </button>
-            </form>
-          )}
-
-          {step === 'checkout' && (
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '30px' }}>
-              <div style={{ backgroundColor: '#0c0a09', padding: '30px', borderRadius: '30px', color: 'white' }}>
-                <p style={{ fontSize: '10px', fontWeight: '900', color: '#10b981', marginBottom: '20px' }}>PAGUE VIA PIX</p>
-                <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '20px', display: 'inline-block', marginBottom: '20px' }}>
-                  <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
+              {/* ÁREA DE PAGAMENTO / COMPROVANTE */}
+              {existingOrder && (
+                <div style={{ marginTop: 30, padding: 20, backgroundColor: '#f8fafc', borderRadius: 25, border: '2px dashed #cbd5e1', textAlign: 'center' }}>
+                   <p style={{ fontWeight: 900, fontSize: 14 }}>PAGAMENTO PIX</p>
+                   <QRCodeSVG value={campaign?.pix_key} size={150} style={{ margin: '15px 0' }} />
+                   <p style={{ fontSize: 18, fontWeight: 900, color: '#059669' }}>Total: R$ {(selectedType?.price * quantity).toFixed(2)}</p>
+                   
+                   <div style={{ marginTop: 15 }}>
+                      <input type="file" style={{ fontSize: 10 }} />
+                      <p style={{ fontSize: 9, color: '#999', marginTop: 5 }}>Envie o print para validar sua reserva</p>
+                   </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 10px' }}>
-                  <span style={{ fontSize: '10px', color: '#78716c' }}>TOTAL</span>
-                  <span style={{ fontWeight: '900', fontSize: '24px' }}>R$ {((product?.price || 0) * quantity).toFixed(2)}</span>
-                </div>
-              </div>
+              )}
 
-              <div style={{ padding: '25px', border: '2px dashed #e7e5e4', borderRadius: '25px' }}>
-                {currentReceipt === 'confirmed' ? (
-                  <div style={{ color: '#059669', fontWeight: 'bold' }}>✅ PAGAMENTO CONFIRMADO!</div>
-                ) : (
-                  <>
-                    {orderStatus === 'rejected' && (
-                      <div style={{ marginBottom: '15px', color: '#dc2626', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>⚠️ Comprovante rejeitado, por favor submeta outro válido.</div>
-                    )}
-                    <p style={{ fontSize: '11px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase', marginBottom: '15px' }}>Anexe o Comprovante</p>
-                    <input type="file" accept="image/*" onChange={handleFileUpload} />
-                    {uploading && <p style={{ fontSize: '10px', color: '#059669', marginTop: '10px' }}>Subindo...</p>}
-                  </>
-                )}
-              </div>
+              {/* HISTÓRICO DE COMPRAS PAGAS */}
+              {pastOrders.length > 0 && (
+                <div style={{ marginTop: 40 }}>
+                   <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase' }}>Compras Realizadas ✅</h3>
+                   {pastOrders.map((o, i) => (
+                     <div key={i} style={{ fontSize: 11, padding: '10px 0', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{new Date(o.created_at).toLocaleDateString()} - {o.quantity}x {o.selected_variations?.name}</span>
+                        <span style={{ color: '#059669', fontWeight: 'bold' }}>PAGO</span>
+                     </div>
+                   ))}
+                   <button onClick={() => { setExistingOrder(null); setIdentified(true); }} style={{ color: '#059669', fontSize: 11, fontWeight: 'bold', background: 'none', border: 'none', marginTop: 10 }}>+ FAZER NOVA COMPRA</button>
+                </div>
+              )}
             </div>
           )}
         </div>
