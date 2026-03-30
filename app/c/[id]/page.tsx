@@ -145,7 +145,6 @@ export default function LandingPageGourmetFinal() {
     });
   };
 
-  // --- 5. HANDLERS (AÇÕES) ---
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
     try {
@@ -187,22 +186,20 @@ export default function LandingPageGourmetFinal() {
     <div className="min-h-screen bg-stone-50 font-sans text-stone-900 selection:bg-emerald-100 pb-20">
       <div className="mx-auto max-w-md bg-white min-h-screen shadow-lg overflow-hidden pb-20 rounded-b-[40px]">
         
-        {/* IMAGEM TOP - 16:9 FIXO COM EFEITO GLASS */}
+        {/* HEADER COM IMAGEM E GLASSMORPHISM */}
         <div className="relative w-full aspect-video bg-stone-100 overflow-hidden">
           {campaign?.image_url ? (
             <img 
               src={campaign.image_url} 
-              alt="Capa da Campanha" 
+              alt="Capa" 
               className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105" 
             />
           ) : (
             <div className="flex h-full items-center justify-center text-6xl bg-stone-100 text-stone-300">🖼️</div>
           )}
           
-          {/* OVERLAY GLASS NO TÍTULO */}
-          <div className="absolute bottom-4 left-4 right-4 bg-white/60 backdrop-blur-lg p-5 rounded-2xl border border-white/20 shadow-xl">
+          <div className="absolute bottom-4 left-4 right-4 bg-white/70 backdrop-blur-md p-5 rounded-3xl border border-white/20 shadow-xl">
             <h1 className="text-2xl font-black text-stone-950 leading-tight italic tracking-tighter">{campaign?.title}</h1>
-            <h1 className="... text-emerald-500">CompraZap EMERALD V2 ⚡</h1>
             <div className="flex items-center gap-2 mt-2">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-stone-700 text-[10px] font-bold uppercase tracking-[0.2em]">Oferta de: {seller?.full_name}</span>
@@ -211,7 +208,7 @@ export default function LandingPageGourmetFinal() {
         </div>
 
         <div className="p-8 space-y-10">
-          <div className="bg-stone-50/50 p-6 rounded-3xl border border-stone-100">
+          <div className="bg-stone-50/50 p-6 rounded-[24px] border border-stone-100">
             <p className="text-stone-700 text-sm font-medium leading-relaxed">{campaign?.description}</p>
           </div>
 
@@ -219,11 +216,11 @@ export default function LandingPageGourmetFinal() {
             <div className="space-y-6 animate-in fade-in duration-500 text-center">
               <div className="space-y-1">
                 <h2 className="text-xl font-extrabold italic tracking-tight text-stone-950">Olá, Vizinho!</h2>
-                <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest">Para começar, precisamos de te identificar.</p>
+                <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest">Identifique-se para continuar.</p>
               </div>
               <input 
                 type="text" placeholder="WhatsApp ou E-mail" 
-                className="w-full rounded-2xl bg-white p-5 text-stone-950 placeholder:text-stone-300 outline-none border border-stone-100 focus:border-emerald-300 transition-all font-medium text-center"
+                className="w-full rounded-2xl bg-stone-50 p-5 text-stone-950 placeholder:text-stone-300 outline-none border border-transparent focus:border-emerald-300 transition-all font-medium text-center"
                 value={contact} onChange={e => setContact(e.target.value)}
               />
               <button onClick={() => setStep('reserva')} className="w-full rounded-full bg-emerald-600 p-6 font-black text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all uppercase text-xs tracking-[0.2em]">
@@ -242,7 +239,7 @@ export default function LandingPageGourmetFinal() {
                       <button 
                         key={v} type="button"
                         onClick={() => setSelectedVariations({...selectedVariations, [key]: v})}
-                        className={`px-6 py-4 rounded-xl text-xs font-black transition-all border ${
+                        className={`px-6 py-3 rounded-xl text-xs font-black transition-all border ${
                           selectedVariations[key] === v 
                           ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' 
                           : 'bg-white text-stone-500 border-stone-100 hover:border-stone-200'
@@ -256,17 +253,17 @@ export default function LandingPageGourmetFinal() {
               ))}
 
               <div className="flex items-center justify-between rounded-2xl bg-stone-50 p-5 border border-stone-100">
-                <span className="font-black uppercase text-[10px] tracking-widest text-stone-600">Quantidade</span>
-                <div className="flex items-center gap-6 text-emerald-700">
-                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} className="h-10 w-10 rounded-full bg-white shadow font-black text-xl hover:bg-emerald-50 active:scale-90">-</button>
+                <span className="font-black uppercase text-[10px] tracking-widest text-stone-500">Quantidade</span>
+                <div className="flex items-center gap-6">
+                  <button type="button" onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black text-xl hover:bg-emerald-50 active:scale-90">-</button>
                   <span className="font-black text-xl w-6 text-center text-stone-950">{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="h-10 w-10 rounded-full bg-white shadow font-black text-xl hover:bg-emerald-50 active:scale-90">+</button>
+                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="h-10 w-10 rounded-full bg-white shadow-sm font-black text-xl hover:bg-emerald-50 active:scale-90">+</button>
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-stone-100">
-                <input placeholder="Seu Nome Completo" required className="w-full rounded-xl bg-white p-5 font-medium outline-none border border-stone-100 focus:border-emerald-200" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-                <input placeholder="Apto / Unidade (ex: 402)" required className="w-full rounded-xl bg-white p-5 font-medium outline-none border border-stone-100 focus:border-emerald-200" value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+                <input placeholder="Seu Nome Completo" required className="w-full rounded-xl bg-stone-50 p-5 font-medium outline-none border border-transparent focus:border-emerald-200 transition-all" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+                <input placeholder="Apto / Unidade" required className="w-full rounded-xl bg-stone-50 p-5 font-medium outline-none border border-transparent focus:border-emerald-200 transition-all" value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               </div>
 
               <button type="submit" className="w-full rounded-full bg-emerald-600 p-6 font-black text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all uppercase text-xs tracking-[0.2em]">
@@ -277,46 +274,45 @@ export default function LandingPageGourmetFinal() {
 
           {step === 'checkout' && (
             <div className="space-y-8 animate-in zoom-in duration-500">
-              <div className="rounded-[32px] bg-stone-950 p-8 text-white shadow-2xl text-center border-4 border-white">
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-400 mb-6">Pague agora via Pix</p>
-                <div className="mx-auto mb-8 inline-block rounded-2xl bg-white p-4 shadow-inner">
+              <div className="rounded-[40px] bg-stone-950 p-8 text-white shadow-2xl text-center border-4 border-white">
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-400 mb-6">Pague via Pix</p>
+                <div className="mx-auto mb-8 inline-block rounded-3xl bg-white p-4 shadow-inner">
                   <QRCodeSVG value={campaign?.pix_key || ''} size={180} />
                 </div>
                 
                 <div className="flex justify-between items-center px-2">
-                   <span className="text-stone-400 text-[10px] font-bold uppercase tracking-tight">TOTAL A PAGAR</span>
+                   <span className="text-stone-400 text-[10px] font-bold uppercase tracking-tight">TOTAL</span>
                    <span className="text-3xl font-black italic">R$ {calculateTotal().toFixed(2)}</span>
                 </div>
               </div>
 
               <div className="rounded-[32px] bg-white p-8 border-2 border-dashed border-stone-200 text-center">
                 {currentReceipt === 'confirmed' ? (
-                   <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col items-center">
-                     <span className="text-3xl mb-3">✅</span>
-                     <p className="text-emerald-900 font-black text-sm uppercase tracking-widest">PAGAMENTO CONFIRMADO!</p>
-                     <p className="text-emerald-700 text-[10px] font-bold mt-1">O vizinho vendedor já está a preparar o seu pedido.</p>
+                   <div className="p-6 bg-emerald-50 rounded-[24px] border border-emerald-100 flex flex-col items-center">
+                     <span className="text-4xl mb-3">✅</span>
+                     <p className="text-emerald-900 font-black text-sm uppercase tracking-widest">PAGO!</p>
+                     <p className="text-emerald-700 text-[10px] font-bold mt-1 text-center">O vizinho já está preparando seu pedido.</p>
                    </div>
                 ) : (
                   <>
-                    {/* ALERTA DE REJEIÇÃO ESTILIZADO */}
                     {orderStatus === 'rejected' && (
                       <div className="mb-6 p-5 bg-red-50 rounded-2xl border border-red-100 flex flex-col items-center">
-                        <span className="text-2xl mb-1.5">⚠️</span>
+                        <span className="text-2xl mb-2">⚠️</span>
                         <p className="text-red-700 font-black text-[10px] uppercase tracking-widest leading-tight text-center">
                           Comprovante rejeitado, por favor submeta outro válido.
                         </p>
                       </div>
                     )}
 
-                    <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-6">Envie o Comprovativo</p>
+                    <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-6">Anexe o Comprovante</p>
                     <div className="relative group">
                       <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                       <div className="w-full py-5 bg-stone-50 text-emerald-700 rounded-full font-black text-[11px] uppercase border border-stone-100 group-hover:border-emerald-200 transition-all flex items-center justify-center gap-2">
-                        {uploading ? 'A SUBIR...' : currentReceipt ? 'SUBIR OUTRO' : 'ANEXAR COMPROVATIVO'}
+                        {uploading ? 'SUBINDO...' : currentReceipt ? 'SUBIR OUTRO' : 'SELECIONAR IMAGEM'}
                       </div>
                     </div>
                     
-                    {currentReceipt && !uploading && orderStatus === 'pending' && <p className="mt-4 text-[9px] font-black text-emerald-600 animate-pulse uppercase tracking-widest italic">Aguardando Aprovação do Vizinho...</p>}
+                    {currentReceipt && !uploading && orderStatus === 'pending' && <p className="mt-4 text-[9px] font-black text-emerald-600 animate-pulse uppercase tracking-widest italic">Aguardando Aprovação...</p>}
                   </>
                 )}
               </div>
