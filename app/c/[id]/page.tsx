@@ -36,6 +36,10 @@ export default function LandingPageGourmetFinal() {
     if (!existingOrder?.id) return;
     const channel = supabase.channel(`order-status-${existingOrder.id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${existingOrder.id}` }, (payload) => {
         setOrderStatus(payload.new.status);
+        // Atualiza a URL do recibo caso ela tenha sido enviada
+        if (payload.new.receipt_url) {
+           setExistingOrder((prev: any) => ({ ...prev, receipt_url: payload.new.receipt_url }));
+        }
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [existingOrder?.id]);
@@ -55,7 +59,6 @@ export default function LandingPageGourmetFinal() {
 
   const totalGeral = itemsList.reduce((acc, curr) => acc + curr.total, 0);
 
-  // --- 🚀 LÓGICA TELEGRAM RESTAURADA ---
   const enviarNotificacaoTelegram = async (order: any) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -81,7 +84,6 @@ export default function LandingPageGourmetFinal() {
     setLoading(true);
     const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', contact).order('created_at', { ascending: false });
     const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', contact).order('created_at', { ascending: false }).limit(1).maybeSingle();
-
     if (orders && orders.length > 0) {
       const pending = orders.find((o: any) => o.status !== 'paid');
       setPastOrders(orders.filter((o: any) => o.status === 'paid'));
@@ -100,7 +102,6 @@ export default function LandingPageGourmetFinal() {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
     setLoading(true);
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending' };
-    
     let savedOrder;
     if (existingOrder && orderStatus !== 'paid') { 
       const { data } = await supabase.from('orders').update(orderData).eq('id', existingOrder.id).select().single(); 
@@ -109,7 +110,6 @@ export default function LandingPageGourmetFinal() {
       const { data } = await supabase.from('orders').insert(orderData).select().single(); 
       savedOrder = data; 
     }
-    
     setExistingOrder(savedOrder);
     setOrderStatus(savedOrder.status);
     await enviarNotificacaoTelegram(savedOrder);
@@ -126,7 +126,11 @@ export default function LandingPageGourmetFinal() {
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
       await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
-      setOrderStatus('pending');
+      
+      // Força o estado local para refletir que o comprovante foi enviado, mas aguarda aprovação
+      setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
+      setOrderStatus('pending'); 
+
       await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id);
       alert("Comprovante enviado!");
     }
@@ -141,6 +145,7 @@ export default function LandingPageGourmetFinal() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
+        {/* HEADER */}
         <div style={{ height: '180px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           <img src={campaign?.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -168,10 +173,10 @@ export default function LandingPageGourmetFinal() {
               </div>
               {itemsList.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: 20, borderRadius: 25 }}>
-                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>LISTA ATUAL</p>
+                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>CARRINHO</p>
                   {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <div style={{ display:'flex', alignItems:'center', gap: 15 }}> <span style={{ fontWeight: 'bold', color: '#059669' }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>✕</button> </div> </div> ))}
-                  <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 20, marginTop: 10 }}>Subtotal: R$ {totalGeral.toFixed(2)}</div>
-                  <button onClick={() => setStep('identificacao')} style={btnStyle}>FINALIZAR</button>
+                  <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 20, marginTop: 10 }}>Total: R$ {totalGeral.toFixed(2)}</div>
+                  <button onClick={() => setStep('identificacao')} style={btnStyle}>PRÓXIMO PASSO</button>
                 </div>
               )}
             </div>
@@ -212,14 +217,15 @@ export default function LandingPageGourmetFinal() {
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
+              {/* --- 🛠️ LÓGICA DE MENSAGENS CORRIGIDA --- */}
               {orderStatus === 'paid' ? (
-                <div style={{ background: '#dcfce7', color: '#166534', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>✅ Pedido Confirmado!</div>
+                <div style={{ background: '#dcfce7', color: '#166534', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>✅ Pagamento aprovado! Pedido concluído.</div>
               ) : orderStatus === 'rejected' ? (
-                <div style={{ background: '#fee2e2', color: '#991b1b', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⚠️ Comprovante rejeitado, envie outro.</div>
+                <div style={{ background: '#fee2e2', color: '#991b1b', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⚠️ Comprovante rejeitado, envie um válido.</div>
               ) : existingOrder?.receipt_url ? (
-                <div style={{ background: '#fef9c3', color: '#854d0e', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⏳ Aguardando Vendedor...</div>
+                <div style={{ background: '#fef9c3', color: '#854d0e', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>⏳ Aguardando aprovação do vendedor...</div>
               ) : (
-                <div style={{ background: '#059669', color: 'white', padding: 20, borderRadius: 25, marginBottom: 20 }}>RESERVA REALIZADA! ✅</div>
+                <div style={{ background: '#f1f5f9', color: '#475569', padding: 20, borderRadius: 25, marginBottom: 20, fontWeight: 'bold' }}>Aguardando envio do comprovante... 📝</div>
               )}
 
               <div style={{ background: 'white', padding: 25, borderRadius: 30, border: '2px solid #f1f5f9', marginBottom: 20 }}>
