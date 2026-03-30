@@ -16,15 +16,13 @@ export default function LandingPageGourmetFinal() {
   const [uploading, setUploading] = useState(false)
   
   const [step, setStep] = useState<'itens' | 'identificacao' | 'dados' | 'concluido'>('itens')
-  
   const [contact, setContact] = useState('')
   const [buyerName, setBuyerName] = useState('')
   const [buyerApto, setBuyerApto] = useState('')
-  
-  const [tempSelection, setTempSelection] = useState<any>(null)
-  const [tempQty, setTempQty] = useState(1)
   const [itemsList, setItemsList] = useState<any[]>([])
   const [existingOrder, setExistingOrder] = useState<any>(null)
+  const [tempSelection, setTempSelection] = useState<any>(null)
+  const [tempQty, setTempQty] = useState(1)
 
   const containerStyle: React.CSSProperties = { maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px rgba(0,0,0,0.1)', fontFamily: 'sans-serif', paddingBottom: '80px' };
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
@@ -47,29 +45,45 @@ export default function LandingPageGourmetFinal() {
 
   const totalGeral = itemsList.reduce((acc, curr) => acc + curr.total, 0);
 
-  // --- INTEGRAÇÃO TELEGRAM ---
-  const notifyTelegram = async (msg: string, photoBase64?: string) => {
-    if (!seller?.telegram_chat_id) return;
-    const botToken = "7916962372:AAESY_3W_S3X4_47Z4p_p6Xz9X_9X_9X_9X"; // Use seu Token Real aqui
-
+  // --- 🚀 LÓGICA TELEGRAM RESTAURADA (A QUE FUNCIONA) ---
+  const enviarNotificacaoTelegram = async (order: any) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    
+    const itensMsg = itemsList.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${totalGeral.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    
     try {
-      if (photoBase64) {
-        const blob = await (await fetch(photoBase64)).blob();
-        const formData = new FormData();
-        formData.append('chat_id', seller.telegram_chat_id);
-        formData.append('photo', blob, 'comprovante.jpg');
-        formData.append('caption', msg);
-        await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: formData });
-      } else {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: seller.telegram_chat_id, text: msg, parse_mode: 'HTML' })
-        });
-      }
-    } catch (e) { console.error("Erro Telegram:", e); }
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' })
+      });
+    } catch (err) { console.error("Erro Telegram:", err); }
   };
 
+  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId, 
+          photo: imageUrl,
+          caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${totalGeral.toFixed(2)}\n\nAceita este pagamento?`,
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
+        })
+      });
+    } catch (err) { console.error("Erro foto Telegram:", err); }
+  };
+
+  // --- 🛠️ HANDLERS ---
   const handleIdentificacao = async () => {
     if (contact.length < 10) return alert("WhatsApp inválido");
     setLoading(true);
@@ -109,42 +123,29 @@ export default function LandingPageGourmetFinal() {
       savedOrder = data;
     }
     setExistingOrder(savedOrder);
-
-    // Notificar Novo Pedido/Alteração
-    const itensMsg = itemsList.map(i => `${i.qty}x ${i.name}`).join(', ');
-    const msg = `🛒 <b>NOVO PEDIDO:</b>\n\n👤 ${buyerName}\n🏠 Unidade: ${buyerApto}\n📱 ${contact}\n📦 Itens: ${itensMsg}\n💰 <b>Total: R$ ${totalGeral.toFixed(2)}</b>`;
-    notifyTelegram(msg);
-
+    await enviarNotificacaoTelegram(savedOrder);
     setStep('concluido');
     setLoading(false);
   };
 
   const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !existingOrder) return;
+    if (!e.target.files || !existingOrder) return;
     setUploading(true);
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      
-      // 1. Atualiza no Banco
-      await supabase.from('orders').update({ 
-        receipt_url: base64, 
-        status: 'waiting_approval' 
-      }).eq('id', existingOrder.id);
-
-      // 2. Notifica Telegram com Foto
-      const msg = `✅ <b>COMPROVANTE RECEBIDO!</b>\n\nDe: ${buyerName}\nValor: R$ ${totalGeral.toFixed(2)}\nCampanha: ${campaign.title}`;
-      await notifyTelegram(msg, base64);
-
-      alert("Comprovante enviado! O vendedor será notificado.");
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
+    const file = e.target.files[0];
+    const fileName = `receipts/${existingOrder.id}-${Date.now()}`;
+    
+    const { error: upErr } = await supabase.storage.from('comprovantes').upload(fileName, file);
+    
+    if (!upErr) {
+      const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
+      await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
+      await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id);
+      alert("Comprovante enviado! Aguarde a confirmação.");
+    }
+    setUploading(false);
   };
 
-  if (loading) return <div style={{textAlign:'center', marginTop:50, fontWeight:'bold'}}>Processando...</div>
+  if (loading) return <div style={{textAlign:'center', marginTop:50, fontWeight:'bold', color: '#059669'}}>Lanai Loading...</div>
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
@@ -160,11 +161,10 @@ export default function LandingPageGourmetFinal() {
 
         <div style={{ padding: 20 }}>
           
-          {/* STEP 1: ITENS */}
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
-                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>ADICIONE OS ITENS</p>
+                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {product?.variations?.map((v: any, index: number) => (
                     <button key={index} onClick={() => setTempSelection(v)}
@@ -190,7 +190,7 @@ export default function LandingPageGourmetFinal() {
 
               {itemsList.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: 20, borderRadius: 25 }}>
-                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>LISTA DE COMPRAS</p>
+                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>CARRINHO</p>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}>
                       <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div>
@@ -201,13 +201,12 @@ export default function LandingPageGourmetFinal() {
                     </div>
                   ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 20, marginTop: 10 }}>Total: R$ {totalGeral.toFixed(2)}</div>
-                  <button onClick={() => setStep('identificacao')} style={btnStyle}>AVANÇAR</button>
+                  <button onClick={() => setStep('identificacao')} style={btnStyle}>PRÓXIMO PASSO</button>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 2: WHATSAPP */}
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999' }}>← Voltar</button>
@@ -217,23 +216,21 @@ export default function LandingPageGourmetFinal() {
             </div>
           )}
 
-          {/* STEP 3: DADOS */}
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('identificacao')} style={{ float: 'left', background: 'none', border: 'none', color: '#999' }}>← Voltar</button>
-              <h3 style={{ fontWeight: 900, marginTop: 40 }}>Dados de Entrega</h3>
+              <h3 style={{ fontWeight: 900, marginTop: 40 }}>Informações de Entrega</h3>
               <p style={{ fontSize: 13, fontWeight: 'bold', color: '#059669', marginBottom: 25 }}>📱 {contact}</p>
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-              <input placeholder="Apto / Unidade" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
-              <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
+              <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR RESERVA</button>
             </div>
           )}
 
-          {/* STEP 4: CONCLUÍDO / PIX */}
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ background: '#059669', color: 'white', padding: 20, borderRadius: 25, marginBottom: 20 }}>
-                <p style={{ fontWeight: 900, margin: 0 }}>PEDIDO REALIZADO! ✅</p>
+                <p style={{ fontWeight: 900, margin: 0 }}>RESERVA REALIZADA! ✅</p>
               </div>
 
               <div style={{ background: 'white', padding: 25, borderRadius: 30, border: '2px solid #f1f5f9', marginBottom: 20 }}>
@@ -243,7 +240,7 @@ export default function LandingPageGourmetFinal() {
               </div>
 
               <div style={{ marginBottom: 25, background: '#fef9c3', padding: 15, borderRadius: 20 }}>
-                <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Clique abaixo para enviar o comprovante:</p>
+                <p style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 10 }}>Anexe o comprovante Pix:</p>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -251,10 +248,10 @@ export default function LandingPageGourmetFinal() {
                   disabled={uploading}
                   style={{ fontSize: 12 }} 
                 />
-                {uploading && <p style={{fontSize: 10, color: '#854d0e'}}>Enviando comprovante...</p>}
+                {uploading && <p style={{fontSize: 10, color: '#854d0e', marginTop: 5}}>Enviando...</p>}
               </div>
               
-              <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>ALTERAR PEDIDO</button>
+              <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR PEDIDO</button>
             </div>
           )}
 
