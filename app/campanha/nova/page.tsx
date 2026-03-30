@@ -13,10 +13,10 @@ export default function NovaCampanha() {
   const [description, setDescription] = useState('')
   const [pixKey, setPixKey] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
-  const [maxSales, setMaxSales] = useState('20')
+  const [maxSales, setMaxSales] = useState('50')
   const [imageUrl, setImageUrl] = useState('')
 
-  // LISTA DINÂMICA DE TIPOS E PREÇOS
+  // LISTA DE VARIAÇÕES (Tipos e Preços)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
   const addVariation = () => {
@@ -40,7 +40,7 @@ export default function NovaCampanha() {
 
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não logado")
+      if (!userId) throw new Error("Usuário não identificado. Faça login novamente.")
 
       // 1. Criar a Campanha
       const { data: camp, error: campErr } = await supabase
@@ -60,114 +60,121 @@ export default function NovaCampanha() {
 
       if (campErr) throw campErr
 
-      // 2. Criar o Produto vinculado com as variações (JSON)
-      // Transformamos os preços em números antes de salvar
+      // 2. Formatar Variações para JSON
       const formattedVariations = variations.map(v => ({
         name: v.name,
         price: parseFloat(v.price.replace(',', '.'))
       }))
 
+      // 3. Criar o Produto (Usando o preço da primeira variação como base)
       const { error: prodErr } = await supabase
         .from('products')
         .insert({
           campaign_id: camp.id,
           name: title,
-          price: formattedVariations[0].price, // Preço base (mínimo)
+          price: formattedVariations[0].price,
           variations: formattedVariations 
         })
 
       if (prodErr) throw prodErr
 
-      alert("Campanha lançada com sucesso! 🚀")
+      alert("Campanha lançada! 🚀")
       router.push('/')
     } catch (err: any) {
-      alert("Erro ao criar: " + err.message)
+      alert("Erro: " + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const inputStyle = "w-full p-4 bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none font-medium text-sm transition-all";
+  // Estilos Inline para evitar erro de build
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '15px', backgroundColor: 'white', borderRadius: '15px',
+    border: '1px solid #e2e8f0', outline: 'none', fontSize: '14px', boxSizing: 'border-box'
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
-      <div className="max-w-md mx-auto space-y-8">
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
+      <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
         
-        <header className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-2xl">←</button>
-          <h1 className="text-xl font-black italic">Nova Campanha ⚡</h1>
+        <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>Criar Oferta ⚡</h1>
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* INFORMAÇÕES BÁSICAS */}
-          <section className="space-y-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">O que você vai vender?</p>
-            <input placeholder="Título (ex: Cuca da Vavá)" required className={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
-            <textarea placeholder="Descrição (detalhes do produto...)" required className={`${inputStyle} h-32 resize-none`} value={description} onChange={e => setDescription(e.target.value)} />
-            <input placeholder="URL da Imagem do Produto" className={inputStyle} value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
-          </section>
+          {/* INFO PRODUTO */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Informações</label>
+            <input placeholder="Título (ex: Cuca de Maçã)" required style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
+            <textarea placeholder="Descrição rápida..." required style={{ ...inputStyle, height: '80px', resize: 'none' }} value={description} onChange={e => setDescription(e.target.value)} />
+            <input placeholder="Link da foto do produto" style={inputStyle} value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
+          </div>
 
-          {/* TIPOS E PREÇOS DINÂMICOS */}
-          <section className="space-y-4 bg-white p-6 rounded-[30px] border border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tipos e Valores</p>
+          {/* TABELA DE PREÇOS DINÂMICA */}
+          <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '25px', border: '1px solid #e2e8f0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '15px', textAlign: 'center' }}>Tipos, Tamanhos e Preços</label>
             
-            {variations.map((v, index) => (
-              <div key={index} className="flex gap-2 items-center animate-in slide-in-from-left duration-300">
-                <input 
-                  placeholder="Nome (ex: G de Maçã)" 
-                  required 
-                  className="flex-1 p-3 bg-slate-50 rounded-xl text-xs border-none outline-none"
-                  value={v.name}
-                  onChange={(e) => updateVariation(index, 'name', e.target.value)}
-                />
-                <input 
-                  placeholder="Preço R$" 
-                  type="text"
-                  required 
-                  className="w-20 p-3 bg-slate-50 rounded-xl text-xs border-none outline-none font-bold text-emerald-600"
-                  value={v.price}
-                  onChange={(e) => updateVariation(index, 'price', e.target.value)}
-                />
-                {variations.length > 1 && (
-                  <button type="button" onClick={() => removeVariation(index)} className="text-red-400 p-2">✕</button>
-                )}
-              </div>
-            ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {variations.map((v, index) => (
+                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input 
+                    placeholder="Ex: Grande / 1Kg" 
+                    required 
+                    style={{ ...inputStyle, padding: '10px', fontSize: '12px' }}
+                    value={v.name}
+                    onChange={(e) => updateVariation(index, 'name', e.target.value)}
+                  />
+                  <input 
+                    placeholder="R$" 
+                    required 
+                    style={{ ...inputStyle, padding: '10px', fontSize: '12px', width: '80px', fontWeight: 'bold', color: '#059669' }}
+                    value={v.price}
+                    onChange={(e) => updateVariation(index, 'price', e.target.value)}
+                  />
+                  {variations.length > 1 && (
+                    <button type="button" onClick={() => removeVariation(index)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
             
             <button 
               type="button" 
               onClick={addVariation}
-              className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase hover:bg-slate-50"
+              style={{ width: '100%', marginTop: '15px', padding: '10px', border: '2px dashed #e2e8f0', borderRadius: '12px', backgroundColor: 'transparent', color: '#94a3b8', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', cursor: 'pointer' }}
             >
               + Adicionar Opção
             </button>
-          </section>
+          </div>
 
-          {/* REGRAS E PAGAMENTO */}
-          <section className="space-y-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Configurações</p>
-            
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">Data de Fim</label>
-                <input type="date" required className={inputStyle} value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+          {/* CONFIGS FINAIS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>DATA LIMITE</label>
+                <input type="date" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
               </div>
-              <div className="w-1/3">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">Limite Un.</label>
-                <input type="number" required className={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
+              <div style={{ width: '100px' }}>
+                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>ESTOQUE</label>
+                <input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
               </div>
             </div>
-
-            <input placeholder="Sua Chave Pix para Receber" required className={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
-          </section>
+            <input placeholder="Chave Pix para Receber" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
+          </div>
 
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-6 bg-emerald-600 text-white rounded-[30px] font-black text-lg shadow-xl shadow-emerald-100 active:scale-95 transition-all disabled:opacity-50"
+            style={{ 
+              width: '100%', padding: '20px', backgroundColor: '#059669', color: 'white', 
+              borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '16px', 
+              cursor: 'pointer', boxShadow: '0 10px 15px rgba(5, 150, 105, 0.2)',
+              marginTop: '10px'
+            }}
           >
-            {loading ? 'LANÇANDO...' : 'LANÇAR CAMPANHA 🚀'}
+            {loading ? 'PUBLICANDO...' : 'LANÇAR NO GRUPO 🚀'}
           </button>
 
         </form>
