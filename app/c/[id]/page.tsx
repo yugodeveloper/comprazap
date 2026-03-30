@@ -44,18 +44,16 @@ export default function LandingPageGourmetFinal() {
     
     const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
     
-    // --- TRATAMENTO PARA EVITAR O ERRO .MAP() ---
     if (pd && pd.variations) {
-      // Se vier como string (formato antigo), transforma em array compatível
+      // Tipagem explícita de 'v' como string para o build passar
       if (typeof pd.variations === 'string') {
-        const legacyVars = pd.variations.split(',').map(v => ({
+        const legacyVars = pd.variations.split(',').map((v: string) => ({
           name: v.trim(),
           price: pd.price || 0
         }));
         pd.variations = legacyVars;
       }
     } else if (pd) {
-      // Se não tiver variações, cria uma baseada no nome do produto
       pd.variations = [{ name: pd.name, price: pd.price || 0 }];
     }
     
@@ -77,8 +75,8 @@ export default function LandingPageGourmetFinal() {
       .eq('buyer_contact', contact);
 
     if (orders && orders.length > 0) {
-      const pending = orders.find(o => o.status !== 'paid');
-      const paid = orders.filter(o => o.status === 'paid');
+      const pending = orders.find((o: any) => o.status !== 'paid');
+      const paid = orders.filter((o: any) => o.status === 'paid');
       
       if (pending) {
         setExistingOrder(pending);
@@ -140,9 +138,8 @@ export default function LandingPageGourmetFinal() {
           <p style={{ color: '#444', fontSize: 14, marginBottom: 20 }}>{campaign?.description}</p>
 
           <div style={{ marginBottom: 25 }}>
-            <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase', marginBottom: 10 }}>Selecione sua opção:</h3>
+            <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase', marginBottom: 10 }}>Opções Disponíveis:</h3>
             
-            {/* O SEGREDO ESTÁ AQUI: Verificação Array.isArray */}
             {product && Array.isArray(product.variations) ? product.variations.map((v: any, index: number) => (
               <div 
                 key={index} 
@@ -157,7 +154,7 @@ export default function LandingPageGourmetFinal() {
                 <span style={{ fontWeight: 'bold', fontSize: 13 }}>{v.name}</span>
                 <span style={{ fontWeight: 900, color: '#059669' }}>R$ {v.price}</span>
               </div>
-            )) : <p style={{fontSize: 10, color: '#999'}}>Nenhuma opção cadastrada.</p>}
+            )) : <p style={{fontSize: 10, color: '#999'}}>Nenhuma opção disponível.</p>}
           </div>
 
           {!identified ? (
@@ -198,7 +195,7 @@ export default function LandingPageGourmetFinal() {
               {pastOrders.length > 0 && (
                 <div style={{ marginTop: 40, borderTop: '1px solid #eee', paddingTop: 20 }}>
                    <h3 style={{ fontSize: 10, fontWeight: 900, color: '#999', textTransform: 'uppercase' }}>Compras Realizadas ✅</h3>
-                   {pastOrders.map((o, i) => (
+                   {pastOrders.map((o: any, i: number) => (
                      <div key={i} style={{ fontSize: 11, padding: '12px 0', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between' }}>
                         <span>{new Date(o.created_at).toLocaleDateString()} - {o.quantity}x {o.selected_variations?.name}</span>
                         <span style={{ color: '#059669', fontWeight: 'bold' }}>PAGO</span>
