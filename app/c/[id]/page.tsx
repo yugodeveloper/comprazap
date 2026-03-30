@@ -14,6 +14,7 @@ export default function LandingPageGourmetFinal() {
   const [seller, setSeller] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState(false)
   
   const [step, setStep] = useState<'identificacao' | 'itens' | 'dados' | 'concluido'>('identificacao')
   const [contact, setContact] = useState('')
@@ -26,16 +27,14 @@ export default function LandingPageGourmetFinal() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  // --- 🔴 INTEGRAÇÃO TELEGRAM (PROTEGIDA) ---
+  // --- 🔴 INTEGRAÇÃO TELEGRAM (MANTIDA IGUAL AO SEU ORIGINAL) ---
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
-
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
     const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
-    
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
@@ -49,7 +48,6 @@ export default function LandingPageGourmetFinal() {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
-
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
         method: 'POST',
@@ -65,7 +63,7 @@ export default function LandingPageGourmetFinal() {
     } catch (err) { console.error("Erro foto Telegram:", err); }
   };
 
-  // --- 🛠️ LÓGICA CORE ---
+  // --- 🛠️ LÓGICA CORE (COM TRATAMENTO DE ERROS) ---
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   useEffect(() => {
@@ -78,17 +76,28 @@ export default function LandingPageGourmetFinal() {
   }, [existingOrder?.id]);
 
   async function fetchData() {
-    const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single();
-    setCampaign(cp);
-    const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
-    if (pd?.variations && typeof pd.variations === 'string') {
-        pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
+    try {
+      const { data: cp, error: cpErr } = await supabase.from('campaigns').select('*').eq('id', id).single();
+      if (cpErr || !cp) { setError(true); setLoading(false); return; }
+      setCampaign(cp);
+
+      const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
+      if (pd?.variations && typeof pd.variations === 'string') {
+          pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
+      }
+      setProduct(pd);
+
+      const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
+      setSeller(sl);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
     }
-    setProduct(pd);
-    const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
-    setSeller(sl);
-    setLoading(false);
   }
+
+  // --- 🚦 CHECAGEM DE STATUS DA CAMPANHA ---
+  const isExpired = campaign?.expires_at ? new Date(campaign.expires_at) < new Date() : false;
 
   const handleIdentificacao = async () => {
     if (contact.length < 10) return alert("WhatsApp inválido");
@@ -154,25 +163,41 @@ export default function LandingPageGourmetFinal() {
     setUploading(false);
   };
 
-  // --- 🎨 INTERFACE ---
   const containerStyle: React.CSSProperties = { maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px rgba(0,0,0,0.1)', fontFamily: 'sans-serif', paddingBottom: '80px' };
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', fontSize: '16px' };
 
   if (loading) return <div style={{textAlign:'center', marginTop:50, fontWeight:'bold', color: '#059669'}}>Lanai Loading...</div>
 
+  if (error) return (
+    <div style={{textAlign:'center', marginTop:100, padding:20}}>
+      <h1 style={{fontWeight:'900', fontStyle:'italic'}}>Ops! ⚡</h1>
+      <p style={{fontSize:12, color:'#999'}}>Campanha não encontrada ou indisponível.</p>
+      <button onClick={() => window.location.href='/'} style={btnStyle}>VOLTAR AO PORTAL</button>
+    </div>
+  );
+
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
         <div style={{ height: '180px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
-          <img src={campaign?.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+          {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>{campaign?.title}</h1>
           </div>
         </div>
 
         <div style={{ padding: 20 }}>
+          
+          {/* AVISO DE ENCERRADO (BLOQUEIA NOVAS COMPRAS) */}
+          {isExpired && step !== 'concluido' && (
+            <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: 20, borderRadius: 20, textAlign: 'center', marginBottom: 20 }}>
+              <p style={{ fontWeight: '900', margin: 0 }}>OFERTA ENCERRADA ❌</p>
+              <p style={{ fontSize: 11, margin: 0 }}>Novas reservas não são mais aceitas.</p>
+            </div>
+          )}
+
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ background: '#fff', padding: '20px', borderRadius: '25px', marginBottom: '20px', border: '1px solid #f1f5f9' }}>
@@ -180,34 +205,40 @@ export default function LandingPageGourmetFinal() {
               </div>
               <h3 style={{ fontWeight: 900, marginTop: 20 }}>Olá! Qual seu WhatsApp?</h3>
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(e.target.value)} />
-              <button onClick={handleIdentificacao} style={btnStyle}>ACESSAR OFERTA</button>
+              <button onClick={handleIdentificacao} style={btnStyle}>ACESSAR</button>
             </div>
           )}
 
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <button onClick={() => setStep('identificacao')} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Telefone</button>
-              <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
-                <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {product?.variations?.map((v: any, index: number) => (
-                    <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '12px 18px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '13px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>{v.name}<br/><span style={{fontSize: 10}}>R$ {v.price}</span></button>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 25 }}>
-                    <button onClick={() => setTempQty(q => Math.max(1, q-1))} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd', fontSize: 20 }}>-</button>
-                    <span style={{ fontWeight: 900, fontSize: 20 }}>{tempQty}</span>
-                    <button onClick={() => setTempQty(q => q+1)} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd', fontSize: 20 }}>+</button>
-                </div>
-                <button onClick={() => { if (!tempSelection) return alert("Selecione um item!"); setItemsList([...itemsList, { id: Date.now(), name: tempSelection.name, price: tempSelection.price, qty: tempQty, total: tempSelection.price * tempQty }]); setTempQty(1); setTempSelection(null); }} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>ADICIONAR À LISTA</button>
-              </div>
-              {itemsList.length > 0 && (
-                <div style={{ background: '#f8fafc', padding: 20, borderRadius: 25 }}>
-                  <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>LISTA ATUAL</p>
-                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <div style={{ display:'flex', alignItems:'center', gap: 15 }}> <span style={{ fontWeight: 'bold', color: '#059669' }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>✕</button> </div> </div> ))}
-                  <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 20, marginTop: 10 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
-                  <button onClick={() => setStep('dados')} style={btnStyle}>FINALIZAR PEDIDO</button>
-                </div>
+              {isExpired ? (
+                <button onClick={() => setStep('identificacao')} style={btnStyle}>VOLTAR</button>
+              ) : (
+                <>
+                  <button onClick={() => setStep('identificacao')} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Telefone</button>
+                  <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
+                    <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {product?.variations?.map((v: any, index: number) => (
+                        <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '12px 18px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '13px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>{v.name}<br/><span style={{fontSize: 10}}>R$ {v.price}</span></button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 25 }}>
+                        <button onClick={() => setTempQty(q => Math.max(1, q-1))} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd', fontSize: 20 }}>-</button>
+                        <span style={{ fontWeight: 900, fontSize: 20 }}>{tempQty}</span>
+                        <button onClick={() => setTempQty(q => q+1)} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #ddd', fontSize: 20 }}>+</button>
+                    </div>
+                    <button onClick={() => { if (!tempSelection) return alert("Selecione um item!"); setItemsList([...itemsList, { id: Date.now(), name: tempSelection.name, price: tempSelection.price, qty: tempQty, total: tempSelection.price * tempQty }]); setTempQty(1); setTempSelection(null); }} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>ADICIONAR À LISTA</button>
+                  </div>
+                  {itemsList.length > 0 && (
+                    <div style={{ background: '#f8fafc', padding: 20, borderRadius: 25 }}>
+                      <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15 }}>LISTA ATUAL</p>
+                      {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <div style={{ display:'flex', alignItems:'center', gap: 15 }}> <span style={{ fontWeight: 'bold', color: '#059669' }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>✕</button> </div> </div> ))}
+                      <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 20, marginTop: 10 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
+                      <button onClick={() => setStep('dados')} style={btnStyle}>FINALIZAR PEDIDO</button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -220,19 +251,6 @@ export default function LandingPageGourmetFinal() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR RESERVA</button>
-              {pastOrders.length > 0 && (
-                <div style={{ marginTop: 40, textAlign: 'left', borderTop: '1px solid #eee', paddingTop: 20 }}>
-                  <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 15 }}>Histórico ✅</p>
-                  {pastOrders.map((order: any) => (
-                    <div key={order.id} style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '15px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{new Date(order.created_at).toLocaleDateString()}</div>
-                      {Array.isArray(order.selected_variations) && order.selected_variations.map((item: any, idx: number) => (
-                        <div key={idx} style={{ fontSize: '12px' }}>{item.qty}x {item.name}</div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -255,13 +273,18 @@ export default function LandingPageGourmetFinal() {
               </div>
 
               {orderStatus === 'paid' ? (
-                <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
+                <button 
+                  onClick={() => { if(isExpired) return alert("Campanha encerrada"); setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); }} 
+                  style={{ ...btnStyle, backgroundColor: '#000', opacity: isExpired ? 0.5 : 1 }}
+                >
+                  {isExpired ? 'Campanha Encerrada' : 'Fazer Novo Pedido'}
+                </button>
               ) : (
                 <div style={{ marginBottom: 25 }}>
                   <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} style={{ fontSize: 12 }} />
                 </div>
               )}
-              {orderStatus !== 'paid' && <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR PEDIDO</button>}
+              {orderStatus !== 'paid' && !isExpired && <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR PEDIDO</button>}
             </div>
           )}
         </div>
