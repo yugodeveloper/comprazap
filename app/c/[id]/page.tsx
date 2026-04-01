@@ -338,10 +338,34 @@ export default function LandingPageGourmetFinal() {
 
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
-              <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Voltar</button>
-              <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Finalize seus dados</h3>
-              <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-              <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Pedido</button>
+              <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Confirmar Entrega</h3>
+              
+              <div style={{marginBottom: 25}}>
+                <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+                <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              </div>
+
+              {/* RESUMO DO PEDIDO ABAIXO DOS CAMPOS */}
+              <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>RESUMO DO PEDIDO</p>
+                    <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#059669', fontSize: '10px', fontWeight: 900, textDecoration: 'underline' }}>ALTERAR</button>
+                  </div>
+                  
+                  {itemsList.map((item) => (
+                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
+                       <span>{item.qty}x {item.name}</span>
+                       <span style={{ fontWeight: 700 }}>R$ {item.total.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  
+                  <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
+                    <span>TOTAL</span>
+                    <span style={{ color: '#059669', fontSize: '16px' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</span>
+                  </div>
+              </div>
+
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
             </div>
           )}
