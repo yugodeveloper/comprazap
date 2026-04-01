@@ -20,41 +20,50 @@ export default function PortalCondominio() {
   const [myCampaigns, setMyCampaigns] = useState<any[]>([])
   const router = useRouter()
 
+  // CORREÇÃO DO USEEFFECT: Usando async/await interno para evitar erro de .catch()
   useEffect(() => {
-    const savedPhone = localStorage.getItem('user_phone');
-    const savedId = localStorage.getItem('user_id');
-    if (savedPhone && savedId) {
-      setPhone(savedPhone);
-      setLoading(true);
-      // Alterado para maybeSingle() para evitar crash se não encontrar
-      supabase.from('profiles').select('*').eq('id', savedId).maybeSingle().then(({ data, error }) => {
-        if (data && !error) {
-          setSavedProfile(data);
-          setIsLoggedIn(true);
-          fetchUserActivity(savedPhone, savedId);
-        } else {
-          localStorage.clear();
+    async function checkSession() {
+      const savedPhone = localStorage.getItem('user_phone');
+      const savedId = localStorage.getItem('user_id');
+      
+      if (savedPhone && savedId) {
+        setPhone(savedPhone);
+        setLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', savedId)
+            .maybeSingle();
+
+          if (data && !error) {
+            setSavedProfile(data);
+            setIsLoggedIn(true);
+            fetchUserActivity(savedPhone, savedId);
+          } else {
+            localStorage.clear();
+          }
+        } catch (err) {
+          console.error("Erro ao recuperar sessão:", err);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
-      }).catch(() => setLoading(false));
+      }
     }
+    checkSession();
   }, []);
 
   const fetchUserActivity = async (userPhone: string, userId: string) => {
     try {
-      const { data: purchases } = await supabase.from('orders').select('*, campaigns(title)').eq('buyer_contact', userPhone);
       const { data: campaigns } = await supabase
         .from('campaigns')
         .select('*, orders(status, receipt_url)')
         .eq('creator_id', userId)
         .order('created_at', { ascending: false });
 
-      setMyPurchases(purchases || [])
       setMyCampaigns(campaigns || [])
     } catch (err) {
       console.error("Erro ao carregar atividades:", err);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -104,15 +113,22 @@ export default function PortalCondominio() {
     setLoading(false);
   };
 
-  const formatPhone = (v: string) => { v = v.replace(/\D/g, ""); v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); v = v.replace(/(\d{5})(\d)/, "$1-$2"); return v.substring(0, 15); }
+  const formatPhone = (v: string) => { 
+    v = v.replace(/\D/g, ""); 
+    v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); 
+    v = v.replace(/(\d{5})(\d)/, "$1-$2"); 
+    return v.substring(0, 15); 
+  }
   
-  // --- CORREÇÃO CRÍTICA AQUI ---
   const handleCheckPhone = async () => { 
     if (phone.length < 14) return alert("Telefone inválido"); 
     setLoading(true); 
     try { 
-      // Mudamos para maybeSingle() para que 'data' venha null em vez de disparar erro
-      const { data: profile, error } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle(); 
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('phone', phone)
+        .maybeSingle(); 
       
       if (error) throw error;
 
@@ -123,7 +139,7 @@ export default function PortalCondominio() {
         setView('signup'); 
       } 
     } catch (error: any) { 
-      alert("Erro de conexão com o banco. Verifique se o banco está ativo ou as chaves na Vercel: " + error.message);
+      alert("Erro: " + error.message);
     } finally { 
       setLoading(false); 
     } 
@@ -134,24 +150,30 @@ export default function PortalCondominio() {
     setLoading(true); 
     try { 
       if (view === 'login') { 
-        if (savedProfile.password === formData.password) { 
+        if (savedProfile && savedProfile.password === formData.password) { 
             localStorage.setItem('user_phone', savedProfile.phone); 
             localStorage.setItem('user_id', savedProfile.id); 
             setIsLoggedIn(true); 
             fetchUserActivity(savedProfile.phone, savedProfile.id);
-        } else { alert("Senha incorreta!"); } 
+        } else { 
+          alert("Senha incorreta!"); 
+        } 
       } else { 
-        // Upsert usando single() é perigoso, mas necessário após o insert. Adicionado try/catch.
-        const { data: profile, error } = await supabase.from('profiles').upsert({ 
-          phone, 
-          full_name: formData.full_name,
-          email: formData.email,
-          unit: formData.unit,
-          password: formData.password 
-        }).select().maybeSingle(); 
+        // Cadastro de novo perfil
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .upsert({ 
+            phone: phone, 
+            full_name: formData.full_name,
+            email: formData.email,
+            unit: formData.unit,
+            password: formData.password 
+          })
+          .select()
+          .maybeSingle(); 
 
         if (error) throw error; 
-        if (!profile) throw new Error("Falha ao criar perfil.");
+        if (!profile) throw new Error("Não foi possível criar o perfil.");
 
         localStorage.setItem('user_phone', profile.phone); 
         localStorage.setItem('user_id', profile.id); 
@@ -159,7 +181,7 @@ export default function PortalCondominio() {
         fetchUserActivity(profile.phone, profile.id);
       } 
     } catch (error: any) { 
-      alert("Erro na autenticação: " + error.message); 
+      alert("Erro: " + error.message); 
     } finally { 
       setLoading(false); 
     } 
