@@ -29,7 +29,6 @@ export default function LandingPageGourmetFinal() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  // --- 📱 MÁSCARA DE TELEFONE ---
   const maskPhone = (value: string) => {
     return value
       .replace(/\D/g, "")
@@ -38,15 +37,13 @@ export default function LandingPageGourmetFinal() {
       .replace(/(-\d{4})(\d+?)$/, "$1");
   };
 
-  // --- 📋 COPIAR PIX ---
   const copyPix = () => {
     if (campaign?.pix_key) {
       navigator.clipboard.writeText(campaign.pix_key);
-      alert("Chave Pix copiada!");
+      alert("Chave Pix copiada! ✅");
     }
   };
 
-  // --- 🔴 INTEGRAÇÃO TELEGRAM ---
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -83,7 +80,6 @@ export default function LandingPageGourmetFinal() {
     } catch (err) { console.error("Erro foto Telegram:", err); }
   };
 
-  // --- 🛠️ LÓGICA CORE ---
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   useEffect(() => {
@@ -117,11 +113,7 @@ export default function LandingPageGourmetFinal() {
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
       setTotalBuyers(count || 0);
 
-    } catch (e) {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(true); } finally { setLoading(false); }
   }
 
   const isExpired = campaign?.expires_at ? new Date(campaign.expires_at) < new Date() : false;
@@ -134,11 +126,13 @@ export default function LandingPageGourmetFinal() {
 
     if (orders && orders.length > 0) {
       const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
-      setPastOrders(orders.filter((o: any) => o.status === 'paid')); // Carrega histórico
+      setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
       if (pending) {
         setExistingOrder(pending);
         setOrderStatus(pending.status);
         setObservations(pending.observations || '');
+        setBuyerName(pending.buyer_name || '');
+        setBuyerApto(pending.buyer_apto || '');
         if (Array.isArray(pending.selected_variations)) {
           setItemsList(pending.selected_variations);
           setStep('concluido');
@@ -201,12 +195,11 @@ export default function LandingPageGourmetFinal() {
       setOrderStatus('pending');
       const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
       await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id, total);
-      alert("Comprovante enviado!");
+      alert("Comprovante enviado! ✅");
     }
     setUploading(false);
   };
 
-  // --- COMPONENTES AUXILIARES ---
   const InfoBadge = ({label, value}: {label: string, value: string}) => (
     <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
       <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</p>
@@ -218,13 +211,12 @@ export default function LandingPageGourmetFinal() {
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', fontSize: '16px' };
 
-  if (loading) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando Oferta...</div>
+  if (loading) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando...</div>
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* CABEÇALHO */}
         <div style={{ height: '140px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -232,7 +224,6 @@ export default function LandingPageGourmetFinal() {
           </div>
         </div>
 
-        {/* INFOS RÁPIDAS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -241,7 +232,6 @@ export default function LandingPageGourmetFinal() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* DESCRIÇÃO E VENDEDOR */}
           <div style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: '0 0 10px 0' }}>{campaign?.description}</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
@@ -256,26 +246,30 @@ export default function LandingPageGourmetFinal() {
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
-              {/* INPUT COM MÁSCARA */}
-              <input 
-                type="tel" 
-                placeholder="(00) 00000-0000" 
-                style={inputStyle} 
-                value={contact} 
-                onChange={e => setContact(maskPhone(e.target.value))} 
-              />
+              <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={handleIdentificacao} style={btnStyle}>ACESSAR OFERTA</button>
+            </div>
+          )}
+
+          {(step === 'itens' || step === 'dados') && (
+            <div style={{ backgroundColor: '#059669', color: 'white', padding: '10px 15px', borderRadius: '15px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <div style={{fontSize: '11px'}}>
+                  <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
+                  <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
+               </div>
+               <div style={{fontSize: '10px', fontWeight: 900}}>{contact}</div>
             </div>
           )}
 
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
               <div style={{ background: 'white', padding: 15, borderRadius: 20, border: '1px solid #eee' }}>
-                <p style={{ fontSize: 9, fontWeight: 900, color: '#999', marginBottom: 12, textAlign: 'center', textTransform: 'uppercase' }}>Selecione seus itens:</p>
+                <p style={{ fontSize: 9, fontWeight: 900, color: '#999', marginBottom: 12, textAlign: 'center', textTransform: 'uppercase' }}>O QUE VOCÊ DESEJA?</p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {Array.isArray(product?.variations) && product.variations.map((v: any, index: number) => (
-                    <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '10px 15px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '12px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>
-                      {v.name}<br/><span style={{fontSize: 9, opacity: 0.8}}>R$ {v.price}</span>
+                    <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '10px 15px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '12px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444', transition: 'all 0.2s' }}>
+                      {v.name}<br/>
+                      <span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>R$ {v.price}</span>
                     </button>
                   ))}
                 </div>
@@ -288,7 +282,7 @@ export default function LandingPageGourmetFinal() {
               </div>
 
               {itemsList.length > 0 && (
-                <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20 }}>
+                <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20, border: '1px solid #dcfce7' }}>
                   {itemsList.map((item) => ( 
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}> 
                       <div style={{fontSize: 13}}><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> 
@@ -296,7 +290,7 @@ export default function LandingPageGourmetFinal() {
                     </div> 
                   ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
-                  <textarea placeholder="Observações..." style={{width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '12px', marginTop: 10}} rows={2} value={observations} onChange={e => setObservations(e.target.value)} />
+                  <textarea placeholder="Observações (opcional)..." style={{width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '12px', marginTop: 10, fontFamily: 'sans-serif', outline: 'none'}} rows={2} value={observations} onChange={e => setObservations(e.target.value)} />
                   <button onClick={() => setStep('dados')} style={btnStyle}>PRÓXIMO PASSO</button>
                 </div>
               )}
@@ -307,16 +301,14 @@ export default function LandingPageGourmetFinal() {
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Voltar</button>
               <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Finalize seus dados</h3>
-              <p style={{ fontSize: 12, fontWeight: 'bold', color: '#059669', marginBottom: 20 }}>📱 {contact}</p>
-              <input placeholder="Seu Nome" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-              <input placeholder="Apto / Bloco" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
-              <button onClick={concluirPedido} style={btnStyle}>GERAR PIX</button>
+              <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+              <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
             </div>
           )}
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
-              {/* STATUS DO PAGAMENTO */}
               <div style={{ 
                 background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', 
                 color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#475569',
@@ -325,7 +317,6 @@ export default function LandingPageGourmetFinal() {
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '⚠️ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
 
-              {/* CARD PIX OU MENSAGEM DE SUCESSO */}
               {orderStatus === 'paid' ? (
                 <div style={{ background: 'white', padding: 30, borderRadius: 30, border: '2px solid #059669', marginBottom: 20 }}>
                   <p style={{ fontWeight: 900, fontSize: 18, color: '#059669' }}>
@@ -336,8 +327,6 @@ export default function LandingPageGourmetFinal() {
                 <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '2px solid #f1f5f9', marginBottom: 15 }}>
                   <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
                   <p style={{ fontWeight: 900, fontSize: 20, color: '#059669', margin: '10px 0' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
-                  
-                  {/* COPIAR PIX DISCRETO */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f8fafc', padding: '8px 12px', borderRadius: 8 }}>
                     <span style={{ fontSize: 10, wordBreak: 'break-all', color: '#64748b' }}>{campaign?.pix_key}</span>
                     <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900, cursor: 'pointer' }}>COPIAR</button>
@@ -345,9 +334,8 @@ export default function LandingPageGourmetFinal() {
                 </div>
               )}
 
-              {/* AÇÕES FINAIS */}
               {orderStatus === 'paid' ? (
-                <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
+                <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
               ) : (
                 <div style={{ marginBottom: 20 }}>
                    <p style={{fontSize: 11, color: '#666', marginBottom: 8}}>Envie o comprovante abaixo:</p>
@@ -358,15 +346,14 @@ export default function LandingPageGourmetFinal() {
             </div>
           )}
 
-          {/* HISTÓRICO DE COMPRAS (Sempre visível após identificação) */}
           {pastOrders.length > 0 && (
             <div style={{ marginTop: 40, borderTop: '2px dashed #e2e8f0', paddingTop: 20 }}>
-              <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textAlign: 'center', marginBottom: 15, textTransform: 'uppercase' }}>Suas compras aprovadas</p>
+              <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textAlign: 'center', marginBottom: 15, textTransform: 'uppercase' }}>Compras nesta oferta ✅</p>
               {pastOrders.map((order: any) => (
                 <div key={order.id} style={{ background: 'white', padding: 12, borderRadius: 15, marginBottom: 10, border: '1px solid #f1f5f9', fontSize: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                     <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                    <span style={{ color: '#059669' }}>PAGO ✅</span>
+                    <span style={{ color: '#059669' }}>PAGO</span>
                   </div>
                   <div style={{ color: '#64748b', fontSize: 11, marginTop: 5 }}>
                     {Array.isArray(order.selected_variations) && order.selected_variations.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
@@ -375,7 +362,6 @@ export default function LandingPageGourmetFinal() {
               ))}
             </div>
           )}
-
         </div>
       </div>
     </div>
