@@ -82,8 +82,6 @@ export default function LandingPageGourmetFinal() {
       setCampaign(cp);
 
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
-      
-      // PROTEÇÃO DE DADOS: Garante que variações seja um Array, mesmo que venha String do banco
       if (pd) {
         if (pd.variations && typeof pd.variations === 'string') {
           pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
@@ -111,7 +109,7 @@ export default function LandingPageGourmetFinal() {
     const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', contact).order('created_at', { ascending: false }).limit(1).maybeSingle();
 
     if (orders && orders.length > 0) {
-      const pending = orders.find((o: any) => o.status !== 'paid');
+      const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
       setPastOrders(orders.filter((o: any) => o.status === 'paid'));
       if (pending) {
         setExistingOrder(pending);
@@ -135,7 +133,7 @@ export default function LandingPageGourmetFinal() {
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending' };
     
     let savedOrder;
-    if (existingOrder && orderStatus !== 'paid') { 
+    if (existingOrder && orderStatus !== 'paid' && orderStatus !== 'cancelled') { 
       const { data } = await supabase.from('orders').update(orderData).eq('id', existingOrder.id).select().single(); 
       savedOrder = data; 
     } else { 
@@ -148,6 +146,28 @@ export default function LandingPageGourmetFinal() {
     await enviarNotificacaoTelegram(savedOrder, itemsList);
     setStep('concluido');
     setLoading(false);
+  };
+
+  // --- NOVA FUNÇÃO: CANCELAR COMPRA ---
+  const handleCancelarCompra = async () => {
+    if (!existingOrder) return;
+    if (!confirm("Tem certeza que deseja cancelar este pedido e voltar para a vitrine?")) return;
+
+    setLoading(true);
+    try {
+      // Marcamos como cancelado no banco para auditoria (ou poderíamos deletar)
+      await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
+      
+      // Limpamos o estado local e voltamos para a vitrine
+      setExistingOrder(null);
+      setOrderStatus('pending');
+      setItemsList([]);
+      setStep('itens');
+    } catch (e) {
+      alert("Erro ao cancelar pedido");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,7 +243,6 @@ export default function LandingPageGourmetFinal() {
                   <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
                     <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {/* CORREÇÃO AQUI: Verificação Array.isArray para evitar erro no .map */}
                       {Array.isArray(product?.variations) && product.variations.map((v: any, index: number) => (
                         <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '12px 18px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '13px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>{v.name}<br/><span style={{fontSize: 10}}>R$ {v.price}</span></button>
                       ))}
@@ -286,10 +305,24 @@ export default function LandingPageGourmetFinal() {
                 </button>
               ) : (
                 <div style={{ marginBottom: 25 }}>
+                   <p style={{fontSize: 12, color: '#666', marginBottom: 10}}>Já pagou? Anexe o comprovante abaixo:</p>
                   <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} style={{ fontSize: 12 }} />
+                  
+                  {/* BOTÃO CANCELAR: Aparece apenas se não enviou o comprovante ainda */}
+                  {!existingOrder?.receipt_url && (
+                    <button 
+                      onClick={handleCancelarCompra} 
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline', marginTop: 25, display: 'block', width: '100%' }}
+                    >
+                      CANCELAR ESTA COMPRA
+                    </button>
+                  )}
                 </div>
               )}
-              {orderStatus !== 'paid' && !isExpired && <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR PEDIDO</button>}
+              
+              {orderStatus !== 'paid' && !isExpired && !existingOrder?.receipt_url && (
+                <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 'bold', textDecoration: 'underline' }}>EDITAR ITENS</button>
+              )}
             </div>
           )}
         </div>
