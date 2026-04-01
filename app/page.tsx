@@ -8,6 +8,7 @@ export default function PortalCondominio() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'phone' | 'login' | 'signup'>('phone')
+  const [configError, setConfigError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({ 
     full_name: '', 
@@ -20,30 +21,15 @@ export default function PortalCondominio() {
   const [myCampaigns, setMyCampaigns] = useState<any[]>([])
   const router = useRouter()
 
-  // CORREÇÃO DO USEEFFECT: Usando async/await interno para evitar erro de .catch()
   useEffect(() => {
-
-// Checagem de segurança: as chaves chegaram no browser?
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      setConfigError("Erro de Configuração: Chaves do Supabase não encontradas na Vercel.");
-    }
+    // 1. Verificação de chaves no Browser (Dedo-duro)
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
-    async function checkSession() {
-      // ... resto da função checkSession igual ...
+    if (!url || !key) {
+      setConfigError("Erro de Configuração: Chaves do Supabase não encontradas na Vercel.");
+      return;
     }
-    checkSession();
-  }, []);
-
-  // Se houver erro de config, mostra na tela em vez de quebrar
-  if (configError) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', color: 'red', fontFamily: 'sans-serif' }}>
-        <h1 style={{fontWeight: 900}}>ERRO DE SISTEMA</h1>
-        <p>{configError}</p>
-        <p style={{color: '#666', fontSize: 10}}>Verifique Environment Variables na Vercel.</p>
-      </div>
-    )
-  }
 
     async function checkSession() {
       const savedPhone = localStorage.getItem('user_phone');
@@ -182,7 +168,6 @@ export default function PortalCondominio() {
           alert("Senha incorreta!"); 
         } 
       } else { 
-        // Cadastro de novo perfil
         const { data: profile, error } = await supabase
           .from('profiles')
           .upsert({ 
@@ -212,6 +197,16 @@ export default function PortalCondominio() {
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
+
+  if (configError) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'red', fontFamily: 'sans-serif' }}>
+        <h1 style={{fontWeight: 900}}>ERRO DE SISTEMA</h1>
+        <p>{configError}</p>
+        <p style={{color: '#666', fontSize: 10}}>Verifique Environment Variables na Vercel.</p>
+      </div>
+    )
+  }
 
   if (!isLoggedIn) { 
       return (
