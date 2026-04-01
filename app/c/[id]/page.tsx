@@ -95,7 +95,6 @@ export default function LandingPageGourmetFinal() {
       const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
       setSeller(sl);
 
-      // Busca total de compradores (pedidos pagos ou pendentes, exceto cancelados)
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
       setTotalBuyers(count || 0);
 
@@ -212,7 +211,7 @@ export default function LandingPageGourmetFinal() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* CABEÇALHO COM IMAGEM (ALTURA REDUZIDA PARA MOBILE) */}
+        {/* CABEÇALHO */}
         <div style={{ height: '140px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -220,7 +219,7 @@ export default function LandingPageGourmetFinal() {
           </div>
         </div>
 
-        {/* BARRA DE INFOS RÁPIDAS (LOCAL, DATA, COMPRADORES) */}
+        {/* BARRA DE INFOS RÁPIDAS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -235,9 +234,29 @@ export default function LandingPageGourmetFinal() {
             </div>
           )}
 
-          {/* DESCRIÇÃO COMPACTA */}
+          {/* DESCRIÇÃO E VENDEDOR */}
           <div style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 15, marginBottom: 20 }}>
-            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: 0 }}>{campaign?.description}</p>
+            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: '0 0 10px 0' }}>{campaign?.description}</p>
+            
+            {/* NOVO: INFO VENDEDOR */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900 }}>
+                  {seller?.full_name?.charAt(0) || 'V'}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
+              </div>
+              {seller?.phone && (
+                <a 
+                  href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '4px 8px', borderRadius: 50 }}
+                >
+                  DÚVIDAS? 📱
+                </a>
+              )}
+            </div>
           </div>
 
           {step === 'identificacao' && (
