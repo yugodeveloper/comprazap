@@ -27,7 +27,7 @@ export default function LandingPageGourmetFinal() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  // --- 🔴 INTEGRAÇÃO TELEGRAM (MANTIDA IGUAL AO SEU ORIGINAL) ---
+  // --- 🔴 INTEGRAÇÃO TELEGRAM ---
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -63,7 +63,7 @@ export default function LandingPageGourmetFinal() {
     } catch (err) { console.error("Erro foto Telegram:", err); }
   };
 
-  // --- 🛠️ LÓGICA CORE (COM TRATAMENTO DE ERROS) ---
+  // --- 🛠️ LÓGICA CORE ---
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   useEffect(() => {
@@ -82,8 +82,14 @@ export default function LandingPageGourmetFinal() {
       setCampaign(cp);
 
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
-      if (pd?.variations && typeof pd.variations === 'string') {
+      
+      // PROTEÇÃO DE DADOS: Garante que variações seja um Array, mesmo que venha String do banco
+      if (pd) {
+        if (pd.variations && typeof pd.variations === 'string') {
           pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
+        } else if (!pd.variations) {
+          pd.variations = [];
+        }
       }
       setProduct(pd);
 
@@ -96,7 +102,6 @@ export default function LandingPageGourmetFinal() {
     }
   }
 
-  // --- 🚦 CHECAGEM DE STATUS DA CAMPANHA ---
   const isExpired = campaign?.expires_at ? new Date(campaign.expires_at) < new Date() : false;
 
   const handleIdentificacao = async () => {
@@ -190,7 +195,6 @@ export default function LandingPageGourmetFinal() {
 
         <div style={{ padding: 20 }}>
           
-          {/* AVISO DE ENCERRADO (BLOQUEIA NOVAS COMPRAS) */}
           {isExpired && step !== 'concluido' && (
             <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: 20, borderRadius: 20, textAlign: 'center', marginBottom: 20 }}>
               <p style={{ fontWeight: '900', margin: 0 }}>OFERTA ENCERRADA ❌</p>
@@ -219,7 +223,8 @@ export default function LandingPageGourmetFinal() {
                   <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '1px solid #eee' }}>
                     <p style={{ fontSize: 10, fontWeight: 900, color: '#999', marginBottom: 15, textAlign: 'center' }}>MONTE SEU PEDIDO</p>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {product?.variations?.map((v: any, index: number) => (
+                      {/* CORREÇÃO AQUI: Verificação Array.isArray para evitar erro no .map */}
+                      {Array.isArray(product?.variations) && product.variations.map((v: any, index: number) => (
                         <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '12px 18px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '13px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>{v.name}<br/><span style={{fontSize: 10}}>R$ {v.price}</span></button>
                       ))}
                     </div>

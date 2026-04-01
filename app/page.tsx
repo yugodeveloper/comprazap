@@ -22,12 +22,11 @@ export default function PortalCondominio() {
   const router = useRouter()
 
   useEffect(() => {
-    // 1. Verificação de chaves no Browser (Dedo-duro)
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
     if (!url || !key) {
-      setConfigError("Erro de Configuração: Chaves do Supabase não encontradas na Vercel.");
+      setConfigError("Erro de Configuração: Chaves do Supabase não encontradas.");
       return;
     }
 
@@ -53,7 +52,7 @@ export default function PortalCondominio() {
             localStorage.clear();
           }
         } catch (err) {
-          console.error("Erro ao recuperar sessão:", err);
+          console.error("Erro na sessão:", err);
         } finally {
           setLoading(false);
         }
@@ -88,37 +87,19 @@ export default function PortalCondominio() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const expiresAt = yesterday.toISOString();
-
     setLoading(true);
-    const { error } = await supabase
-      .from('campaigns')
-      .update({ expires_at: expiresAt, status: 'expired' })
-      .eq('id', campId);
-
-    if (error) {
-      alert("Erro ao salvar no banco: " + error.message);
-    } else {
-      setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'expired' } : c));
-    }
+    const { error } = await supabase.from('campaigns').update({ expires_at: expiresAt, status: 'expired' }).eq('id', campId);
+    if (error) alert("Erro: " + error.message);
+    else setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'expired' } : c));
     setLoading(false);
   };
 
   const handleReactivate = async (campId: string) => {
-    const novaData = new Date();
-    novaData.setDate(novaData.getDate() + 7);
-    const expiresAt = novaData.toISOString();
-
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     setLoading(true);
-    const { error } = await supabase
-      .from('campaigns')
-      .update({ expires_at: expiresAt, status: 'active' })
-      .eq('id', campId);
-
-    if (error) {
-      alert("Erro ao reativar no banco: " + error.message);
-    } else {
-      setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
-    }
+    const { error } = await supabase.from('campaigns').update({ expires_at: expiresAt, status: 'active' }).eq('id', campId);
+    if (error) alert("Erro: " + error.message);
+    else setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
     setLoading(false);
   };
 
@@ -133,25 +114,12 @@ export default function PortalCondominio() {
     if (phone.length < 14) return alert("Telefone inválido"); 
     setLoading(true); 
     try { 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('phone', phone)
-        .maybeSingle(); 
-      
+      const { data: profile, error } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle(); 
       if (error) throw error;
-
-      if (profile) { 
-        setSavedProfile(profile); 
-        setView('login'); 
-      } else { 
-        setView('signup'); 
-      } 
-    } catch (error: any) { 
-      alert("Erro: " + error.message);
-    } finally { 
-      setLoading(false); 
-    } 
+      if (profile) { setSavedProfile(profile); setView('login'); } 
+      else { setView('signup'); } 
+    } catch (error: any) { alert("Erro: " + error.message); } 
+    finally { setLoading(false); } 
   }
 
   const handleAuthAction = async (e: React.FormEvent) => { 
@@ -164,35 +132,18 @@ export default function PortalCondominio() {
             localStorage.setItem('user_id', savedProfile.id); 
             setIsLoggedIn(true); 
             fetchUserActivity(savedProfile.phone, savedProfile.id);
-        } else { 
-          alert("Senha incorreta!"); 
-        } 
+        } else { alert("Senha incorreta!"); } 
       } else { 
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .upsert({ 
-            phone: phone, 
-            full_name: formData.full_name,
-            email: formData.email,
-            unit: formData.unit,
-            password: formData.password 
-          })
-          .select()
-          .maybeSingle(); 
-
+        const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData }).select().maybeSingle(); 
         if (error) throw error; 
-        if (!profile) throw new Error("Não foi possível criar o perfil.");
-
+        if (!profile) throw new Error("Erro ao criar perfil.");
         localStorage.setItem('user_phone', profile.phone); 
         localStorage.setItem('user_id', profile.id); 
         setIsLoggedIn(true); 
         fetchUserActivity(profile.phone, profile.id);
       } 
-    } catch (error: any) { 
-      alert("Erro: " + error.message); 
-    } finally { 
-      setLoading(false); 
-    } 
+    } catch (error: any) { alert("Erro: " + error.message); } 
+    finally { setLoading(false); } 
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
@@ -229,7 +180,6 @@ export default function PortalCondominio() {
           )}
           {view === 'signup' && (
             <form onSubmit={handleAuthAction}>
-              <h2 style={{ textAlign: 'center', fontWeight: '900', fontStyle: 'italic', marginBottom: '20px', fontSize: '18px' }}>Criar Perfil</h2>
               <input placeholder="Nome Completo" required style={inputStyle} value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
               <input placeholder="Unidade (Apto)" required style={inputStyle} value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
