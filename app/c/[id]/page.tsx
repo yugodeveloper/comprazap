@@ -26,6 +26,7 @@ export default function LandingPageGourmetFinal() {
   const [existingOrder, setExistingOrder] = useState<any>(null)
   const [orderStatus, setOrderStatus] = useState<string>('pending')
   const [pastOrders, setPastOrders] = useState<any[]>([])
+  const [showHistory, setShowHistory] = useState(false)
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
@@ -42,6 +43,16 @@ export default function LandingPageGourmetFinal() {
       navigator.clipboard.writeText(campaign.pix_key);
       alert("Chave Pix copiada! ✅");
     }
+  };
+
+  const handleLogout = () => {
+    setContact('');
+    setBuyerName('');
+    setBuyerApto('');
+    setPastOrders([]);
+    setItemsList([]);
+    setExistingOrder(null);
+    setStep('identificacao');
   };
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
@@ -115,8 +126,6 @@ export default function LandingPageGourmetFinal() {
 
     } catch (e) { setError(true); } finally { setLoading(false); }
   }
-
-  const isExpired = campaign?.expires_at ? new Date(campaign.expires_at) < new Date() : false;
 
   const handleIdentificacao = async () => {
     if (contact.length < 14) return alert("WhatsApp inválido");
@@ -251,13 +260,43 @@ export default function LandingPageGourmetFinal() {
             </div>
           )}
 
-          {(step === 'itens' || step === 'dados') && (
-            <div style={{ backgroundColor: '#059669', color: 'white', padding: '10px 15px', borderRadius: '15px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <div style={{fontSize: '11px'}}>
-                  <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
-                  <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
+          {(step !== 'identificacao') && (
+            <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{fontSize: '11px'}}>
+                      <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
+                      <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
+                      <p style={{margin: '2px 0 0 0', fontWeight: 900, fontSize: '10px'}}>{contact}</p>
+                  </div>
+                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
                </div>
-               <div style={{fontSize: '10px', fontWeight: 900}}>{contact}</div>
+               
+               {pastOrders.length > 0 && (
+                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', marginTop: 10, paddingTop: 10 }}>
+                    <button 
+                      onClick={() => setShowHistory(!showHistory)} 
+                      style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+                    >
+                      🛒 Pedidos anteriores desta campanha ({pastOrders.length}) {showHistory ? '▲' : '▼'}
+                    </button>
+                    
+                    {showHistory && (
+                      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {pastOrders.map((order: any) => (
+                          <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                              <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
+                            </div>
+                            <div style={{ opacity: 0.8, fontStyle: 'italic' }}>
+                              {order.selected_variations?.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                 </div>
+               )}
             </div>
           )}
 
@@ -343,23 +382,6 @@ export default function LandingPageGourmetFinal() {
                   {!existingOrder?.receipt_url && <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, fontWeight: 'bold', textDecoration: 'underline', marginTop: 20, display: 'block', width: '100%' }}>CANCELAR PEDIDO</button>}
                 </div>
               )}
-            </div>
-          )}
-
-          {pastOrders.length > 0 && (
-            <div style={{ marginTop: 40, borderTop: '2px dashed #e2e8f0', paddingTop: 20 }}>
-              <p style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textAlign: 'center', marginBottom: 15, textTransform: 'uppercase' }}>Compras nesta oferta ✅</p>
-              {pastOrders.map((order: any) => (
-                <div key={order.id} style={{ background: 'white', padding: 12, borderRadius: 15, marginBottom: 10, border: '1px solid #f1f5f9', fontSize: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                    <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                    <span style={{ color: '#059669' }}>PAGO</span>
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: 11, marginTop: 5 }}>
-                    {Array.isArray(order.selected_variations) && order.selected_variations.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </div>
