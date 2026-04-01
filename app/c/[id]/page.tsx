@@ -46,13 +46,8 @@ export default function LandingPageGourmetFinal() {
   };
 
   const handleLogout = () => {
-    setContact('');
-    setBuyerName('');
-    setBuyerApto('');
-    setPastOrders([]);
-    setItemsList([]);
-    setExistingOrder(null);
-    setStep('identificacao');
+    setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
+    setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
@@ -65,8 +60,7 @@ export default function LandingPageGourmetFinal() {
     const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}${obsMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'Markdown' })
       });
     } catch (err) { console.error("Erro Telegram:", err); }
@@ -78,11 +72,9 @@ export default function LandingPageGourmetFinal() {
     if (!token || !chatId) return;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: chatId, 
-          photo: imageUrl,
+          chat_id: chatId, photo: imageUrl,
           caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${total.toFixed(2)}\n\nAceita este pagamento?`,
           parse_mode: 'Markdown',
           reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
@@ -107,23 +99,17 @@ export default function LandingPageGourmetFinal() {
       const { data: cp, error: cpErr } = await supabase.from('campaigns').select('*').eq('id', id).single();
       if (cpErr || !cp) { setError(true); setLoading(false); return; }
       setCampaign(cp);
-
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
       if (pd) {
         if (pd.variations && typeof pd.variations === 'string') {
           pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
-        } else if (!pd.variations) {
-          pd.variations = [];
-        }
+        } else if (!pd.variations) { pd.variations = []; }
       }
       setProduct(pd);
-
       const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
       setSeller(sl);
-
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
       setTotalBuyers(count || 0);
-
     } catch (e) { setError(true); } finally { setLoading(false); }
   }
 
@@ -132,34 +118,25 @@ export default function LandingPageGourmetFinal() {
     setLoading(true);
     const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', contact).order('created_at', { ascending: false });
     const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', contact).order('created_at', { ascending: false }).limit(1).maybeSingle();
-
     if (orders && orders.length > 0) {
       const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
       setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
       if (pending) {
-        setExistingOrder(pending);
-        setOrderStatus(pending.status);
-        setObservations(pending.observations || '');
-        setBuyerName(pending.buyer_name || '');
-        setBuyerApto(pending.buyer_apto || '');
+        setExistingOrder(pending); setOrderStatus(pending.status); setObservations(pending.observations || '');
+        setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
         if (Array.isArray(pending.selected_variations)) {
-          setItemsList(pending.selected_variations);
-          setStep('concluido');
-          setLoading(false);
-          return;
+          setItemsList(pending.selected_variations); setStep('concluido'); setLoading(false); return;
         }
       }
     }
     if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
-    setStep('itens');
-    setLoading(false);
+    setStep('itens'); setLoading(false);
   };
 
   const concluirPedido = async () => {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
     setLoading(true);
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations: observations };
-    
     let savedOrder;
     if (existingOrder && orderStatus !== 'paid' && orderStatus !== 'cancelled') { 
       const { data } = await supabase.from('orders').update(orderData).eq('id', existingOrder.id).select().single(); 
@@ -168,12 +145,9 @@ export default function LandingPageGourmetFinal() {
       const { data } = await supabase.from('orders').insert(orderData).select().single(); 
       savedOrder = data; 
     }
-    
-    setExistingOrder(savedOrder);
-    setOrderStatus(savedOrder.status);
+    setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
     await enviarNotificacaoTelegram(savedOrder, itemsList);
-    setStep('concluido');
-    setLoading(false);
+    setStep('concluido'); setLoading(false);
   };
 
   const handleCancelarCompra = async () => {
@@ -182,13 +156,8 @@ export default function LandingPageGourmetFinal() {
     setLoading(true);
     try {
       await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
-      setExistingOrder(null);
-      setOrderStatus('pending');
-      setItemsList([]);
-      setObservations('');
-      setStep('itens');
-    } catch (e) { alert("Erro ao cancelar"); }
-    finally { setLoading(false); }
+      setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens');
+    } catch (e) { alert("Erro ao cancelar"); } finally { setLoading(false); }
   };
 
   const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,16 +239,9 @@ export default function LandingPageGourmetFinal() {
                   </div>
                   <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
                </div>
-               
                {pastOrders.length > 0 && (
                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', marginTop: 10, paddingTop: 10 }}>
-                    <button 
-                      onClick={() => setShowHistory(!showHistory)} 
-                      style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
-                    >
-                      🛒 Pedidos anteriores desta campanha ({pastOrders.length}) {showHistory ? '▲' : '▼'}
-                    </button>
-                    
+                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
                     {showHistory && (
                       <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {pastOrders.map((order: any) => (
@@ -288,9 +250,7 @@ export default function LandingPageGourmetFinal() {
                               <span>{new Date(order.created_at).toLocaleDateString()}</span>
                               <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
                             </div>
-                            <div style={{ opacity: 0.8, fontStyle: 'italic' }}>
-                              {order.selected_variations?.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
-                            </div>
+                            <div style={{ opacity: 0.8 }}>{order.selected_variations?.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}</div>
                           </div>
                         ))}
                       </div>
@@ -306,9 +266,8 @@ export default function LandingPageGourmetFinal() {
                 <p style={{ fontSize: 9, fontWeight: 900, color: '#999', marginBottom: 12, textAlign: 'center', textTransform: 'uppercase' }}>O QUE VOCÊ DESEJA?</p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {Array.isArray(product?.variations) && product.variations.map((v: any, index: number) => (
-                    <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '10px 15px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '12px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444', transition: 'all 0.2s' }}>
-                      {v.name}<br/>
-                      <span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>R$ {v.price}</span>
+                    <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '10px 15px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '12px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>
+                      {v.name}<br/><span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>R$ {v.price}</span>
                     </button>
                   ))}
                 </div>
@@ -319,15 +278,9 @@ export default function LandingPageGourmetFinal() {
                 </div>
                 <button onClick={() => { if (!tempSelection) return alert("Selecione um item!"); setItemsList([...itemsList, { id: Date.now(), name: tempSelection.name, price: tempSelection.price, qty: tempQty, total: tempSelection.price * tempQty }]); setTempQty(1); setTempSelection(null); }} style={{ ...btnStyle, backgroundColor: '#000', padding: 14, fontSize: 13, marginTop: 20 }}>ADICIONAR À LISTA</button>
               </div>
-
               {itemsList.length > 0 && (
                 <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20, border: '1px solid #dcfce7' }}>
-                  {itemsList.map((item) => ( 
-                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}> 
-                      <div style={{fontSize: 13}}><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> 
-                      <div style={{ display:'flex', alignItems:'center', gap: 10 }}> <span style={{ fontWeight: 'bold', color: '#059669', fontSize: 13 }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> 
-                    </div> 
-                  ))}
+                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}> <div style={{fontSize: 13}}><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <div style={{ display:'flex', alignItems:'center', gap: 10 }}> <span style={{ fontWeight: 'bold', color: '#059669', fontSize: 13 }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> </div> ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
                   <textarea placeholder="Observações (opcional)..." style={{width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '12px', marginTop: 10, fontFamily: 'sans-serif', outline: 'none'}} rows={2} value={observations} onChange={e => setObservations(e.target.value)} />
                   <button onClick={() => setStep('dados')} style={btnStyle}>PRÓXIMO PASSO</button>
@@ -339,52 +292,41 @@ export default function LandingPageGourmetFinal() {
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Pedido</button>
-              <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Confirmar Entrega</h3>
+              <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Finalize seus dados</h3>
+              <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+              <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               
-              <div style={{marginBottom: 25}}>
-                <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-                <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
-              </div>
+              {/* BOTÃO CONFIRMAR NO TOPO DO RESUMO */}
+              <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
 
-              {/* RESUMO DO PEDIDO ABAIXO DOS CAMPOS */}
-              <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left' }}>
+              {/* RESUMO DO PEDIDO LOGO ABAIXO DO BOTÃO */}
+              <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>RESUMO DO PEDIDO</p>
+                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
                     <button onClick={() => setStep('itens')} style={{ background: 'none', border: 'none', color: '#059669', fontSize: '10px', fontWeight: 900, textDecoration: 'underline' }}>ALTERAR</button>
                   </div>
-                  
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
                        <span style={{ fontWeight: 700 }}>R$ {item.total.toFixed(2)}</span>
                     </div>
                   ))}
-                  
                   <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
                     <span>TOTAL</span>
                     <span style={{ color: '#059669', fontSize: '16px' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</span>
                   </div>
               </div>
-
-              <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
             </div>
           )}
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', 
-                color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#475569',
-                padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold', fontSize: 13 
-              }}>
+              <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#475569', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold', fontSize: 13 }}>
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '⚠️ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
-
               {orderStatus === 'paid' ? (
                 <div style={{ background: 'white', padding: 30, borderRadius: 30, border: '2px solid #059669', marginBottom: 20 }}>
-                  <p style={{ fontWeight: 900, fontSize: 18, color: '#059669' }}>
-                    R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)} confirmado no Pix {campaign?.pix_key}
-                  </p>
+                  <p style={{ fontWeight: 900, fontSize: 18, color: '#059669' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)} confirmado no Pix {campaign?.pix_key}</p>
                 </div>
               ) : (
                 <div style={{ background: 'white', padding: 20, borderRadius: 25, border: '2px solid #f1f5f9', marginBottom: 15 }}>
@@ -392,11 +334,10 @@ export default function LandingPageGourmetFinal() {
                   <p style={{ fontWeight: 900, fontSize: 20, color: '#059669', margin: '10px 0' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f8fafc', padding: '8px 12px', borderRadius: 8 }}>
                     <span style={{ fontSize: 10, wordBreak: 'break-all', color: '#64748b' }}>{campaign?.pix_key}</span>
-                    <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900, cursor: 'pointer' }}>COPIAR</button>
+                    <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900 }}>COPIAR</button>
                   </div>
                 </div>
               )}
-
               {orderStatus === 'paid' ? (
                 <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
               ) : (
