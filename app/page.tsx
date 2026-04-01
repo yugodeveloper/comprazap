@@ -26,8 +26,9 @@ export default function PortalCondominio() {
     if (savedPhone && savedId) {
       setPhone(savedPhone);
       setLoading(true);
-      supabase.from('profiles').select('*').eq('id', savedId).single().then(({ data }) => {
-        if (data) {
+      // Alterado para maybeSingle() para evitar crash se não encontrar
+      supabase.from('profiles').select('*').eq('id', savedId).maybeSingle().then(({ data, error }) => {
+        if (data && !error) {
           setSavedProfile(data);
           setIsLoggedIn(true);
           fetchUserActivity(savedPhone, savedId);
@@ -35,21 +36,26 @@ export default function PortalCondominio() {
           localStorage.clear();
         }
         setLoading(false);
-      });
+      }).catch(() => setLoading(false));
     }
   }, []);
 
   const fetchUserActivity = async (userPhone: string, userId: string) => {
-    const { data: purchases } = await supabase.from('orders').select('*, campaigns(title)').eq('buyer_contact', userPhone);
-    const { data: campaigns } = await supabase
-      .from('campaigns')
-      .select('*, orders(status, receipt_url)')
-      .eq('creator_id', userId)
-      .order('created_at', { ascending: false });
+    try {
+      const { data: purchases } = await supabase.from('orders').select('*, campaigns(title)').eq('buyer_contact', userPhone);
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('*, orders(status, receipt_url)')
+        .eq('creator_id', userId)
+        .order('created_at', { ascending: false });
 
-    setMyPurchases(purchases || [])
-    setMyCampaigns(campaigns || [])
-    setLoading(false)
+      setMyPurchases(purchases || [])
+      setMyCampaigns(campaigns || [])
+    } catch (err) {
+      console.error("Erro ao carregar atividades:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const handleShare = (camp: any) => {
@@ -59,11 +65,8 @@ export default function PortalCondominio() {
     alert("Link copiado! ✅");
   };
 
-  // --- AJUSTE: ENCERRAR COM DATA RETROATIVA PARA PERSISTÊNCIA ---
   const handleEndCampaign = async (campId: string) => {
     if(!confirm("Encerrar esta campanha agora?")) return;
-    
-    // Ontem, para garantir expiração imediata no banco
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const expiresAt = yesterday.toISOString();
@@ -82,7 +85,6 @@ export default function PortalCondominio() {
     setLoading(false);
   };
 
-  // --- AJUSTE: REATIVAR COM DATA FUTURA (7 DIAS) ---
   const handleReactivate = async (campId: string) => {
     const novaData = new Date();
     novaData.setDate(novaData.getDate() + 7);
@@ -104,14 +106,27 @@ export default function PortalCondominio() {
 
   const formatPhone = (v: string) => { v = v.replace(/\D/g, ""); v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); v = v.replace(/(\d{5})(\d)/, "$1-$2"); return v.substring(0, 15); }
   
+  // --- CORREÇÃO CRÍTICA AQUI ---
   const handleCheckPhone = async () => { 
     if (phone.length < 14) return alert("Telefone inválido"); 
     setLoading(true); 
     try { 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle(); 
-      if (profile) { setSavedProfile(profile); setView('login'); } 
-      else { setView('signup'); } 
-    } finally { setLoading(false); } 
+      // Mudamos para maybeSingle() para que 'data' venha null em vez de disparar erro
+      const { data: profile, error } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle(); 
+      
+      if (error) throw error;
+
+      if (profile) { 
+        setSavedProfile(profile); 
+        setView('login'); 
+      } else { 
+        setView('signup'); 
+      } 
+    } catch (error: any) { 
+      alert("Erro de conexão com o banco. Verifique se o banco está ativo ou as chaves na Vercel: " + error.message);
+    } finally { 
+      setLoading(false); 
+    } 
   }
 
   const handleAuthAction = async (e: React.FormEvent) => { 
@@ -126,17 +141,30 @@ export default function PortalCondominio() {
             fetchUserActivity(savedProfile.phone, savedProfile.id);
         } else { alert("Senha incorreta!"); } 
       } else { 
-        const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData }).select().single(); 
+        // Upsert usando single() é perigoso, mas necessário após o insert. Adicionado try/catch.
+        const { data: profile, error } = await supabase.from('profiles').upsert({ 
+          phone, 
+          full_name: formData.full_name,
+          email: formData.email,
+          unit: formData.unit,
+          password: formData.password 
+        }).select().maybeSingle(); 
+
         if (error) throw error; 
+        if (!profile) throw new Error("Falha ao criar perfil.");
+
         localStorage.setItem('user_phone', profile.phone); 
         localStorage.setItem('user_id', profile.id); 
-        setIsLoggedIn(true); fetchUserActivity(profile.phone, profile.id);
+        setIsLoggedIn(true); 
+        fetchUserActivity(profile.phone, profile.id);
       } 
-    } catch (error: any) { alert(error.message); } 
-    finally { setLoading(false); } 
+    } catch (error: any) { 
+      alert("Erro na autenticação: " + error.message); 
+    } finally { 
+      setLoading(false); 
+    } 
   }
 
-  // --- ESTILOS FIXOS (AJUSTADOS PARA COMPACTAÇÃO) ---
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
 
@@ -159,6 +187,15 @@ export default function PortalCondominio() {
               <button type="submit" style={btnEmerald}>CONFIRMAR</button>
             </form>
           )}
+          {view === 'signup' && (
+            <form onSubmit={handleAuthAction}>
+              <h2 style={{ textAlign: 'center', fontWeight: '900', fontStyle: 'italic', marginBottom: '20px', fontSize: '18px' }}>Criar Perfil</h2>
+              <input placeholder="Nome Completo" required style={inputStyle} value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
+              <input placeholder="Unidade (Apto)" required style={inputStyle} value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
+              <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+              <button type="submit" style={btnEmerald}>CADASTRAR</button>
+            </form>
+          )}
         </div>
       </div>
     )
@@ -167,8 +204,6 @@ export default function PortalCondominio() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '12px', fontFamily: 'sans-serif', color: '#1c1917' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto' }}>
-        
-        {/* HEADER COMPACTO */}
         <header style={{ backgroundColor: 'white', padding: '12px 18px', borderRadius: '18px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
@@ -179,7 +214,6 @@ export default function PortalCondominio() {
 
         <section>
           <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
-          
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {myCampaigns.map(camp => {
               const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
@@ -187,7 +221,7 @@ export default function PortalCondominio() {
                 <div key={camp.id} style={{ backgroundColor: 'white', padding: '10px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f5f5f4', overflow: 'hidden', flexShrink: 0 }}>
-                      {camp.image_url && <img src={camp.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                      {camp.image_url && <img src={camp.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
@@ -205,7 +239,7 @@ export default function PortalCondominio() {
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR</button>
                     {isExpired ? (
-                      <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
+                      <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
                     ) : (
                       <button onClick={() => handleEndCampaign(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#fef2f2', color: '#ef4444', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>ENCERRAR</button>
                     )}
