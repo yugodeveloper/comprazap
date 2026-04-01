@@ -50,6 +50,7 @@ export default function LandingPageGourmetFinal() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
+  // --- 🔴 INTEGRAÇÃO TELEGRAM RESTAURADA ---
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -146,7 +147,10 @@ export default function LandingPageGourmetFinal() {
       savedOrder = data; 
     }
     setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
+    
+    // CHAMADA DO TELEGRAM RESTAURADA
     await enviarNotificacaoTelegram(savedOrder, itemsList);
+    
     setStep('concluido'); setLoading(false);
   };
 
@@ -172,7 +176,10 @@ export default function LandingPageGourmetFinal() {
       setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
       setOrderStatus('pending');
       const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
+      
+      // CHAMADA DO TELEGRAM PARA COMPROVANTE RESTAURADA
       await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id, total);
+      
       alert("Comprovante enviado! ✅");
     }
     setUploading(false);
@@ -209,7 +216,6 @@ export default function LandingPageGourmetFinal() {
         </div>
 
         <div style={{ padding: '15px 20px' }}>
-          
           <div style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: '0 0 10px 0' }}>{campaign?.description}</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
@@ -267,8 +273,7 @@ export default function LandingPageGourmetFinal() {
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {Array.isArray(product?.variations) && product.variations.map((v: any, index: number) => (
                     <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '10px 15px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '12px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444', transition: 'all 0.2s' }}>
-                      {v.name}<br/>
-                      <span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>R$ {v.price}</span>
+                      {v.name}<br/><span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>R$ {v.price}</span>
                     </button>
                   ))}
                 </div>
@@ -281,10 +286,7 @@ export default function LandingPageGourmetFinal() {
               </div>
               {itemsList.length > 0 && (
                 <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20, border: '1px solid #dcfce7' }}>
-                  {itemsList.map((item) => ( 
-                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}> 
-                      <div style={{fontSize: 13}}><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> 
-                      <div style={{ display:'flex', alignItems:'center', gap: 10 }}> <span style={{ fontWeight: 'bold', color: '#059669', fontSize: 13 }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> </div> ))}
+                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}> <div style={{fontSize: 13}}><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <div style={{ display:'flex', alignItems:'center', gap: 10 }}> <span style={{ fontWeight: 'bold', color: '#059669', fontSize: 13 }}>R$ {item.total.toFixed(2)}</span> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> </div> ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
                   <textarea placeholder="Observações (opcional)..." style={{width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '12px', marginTop: 10, fontFamily: 'sans-serif', outline: 'none'}} rows={2} value={observations} onChange={e => setObservations(e.target.value)} />
                   <button onClick={() => setStep('dados')} style={btnStyle}>PRÓXIMO PASSO</button>
@@ -340,7 +342,6 @@ export default function LandingPageGourmetFinal() {
                 </div>
               )}
 
-              {/* RESUMO DO PEDIDO PERSISTENTE NA TELA FINAL */}
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginBottom: '20px' }}>
                   <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0', textAlign: 'center' }}>DETALHES DO PEDIDO</p>
                   {itemsList.map((item) => (
@@ -350,9 +351,7 @@ export default function LandingPageGourmetFinal() {
                     </div>
                   ))}
                   {observations && (
-                    <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '5px' }}>
-                      Obs: {observations}
-                    </p>
+                    <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '5px' }}>Obs: {observations}</p>
                   )}
                   <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
                     <span>TOTAL PAGO</span>
