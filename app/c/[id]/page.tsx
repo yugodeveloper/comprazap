@@ -21,6 +21,7 @@ export default function LandingPageGourmetFinal() {
   const [contact, setContact] = useState('')
   const [buyerName, setBuyerName] = useState('')
   const [buyerApto, setBuyerApto] = useState('')
+  const [observations, setObservations] = useState('') // Novo estado para observações
   const [itemsList, setItemsList] = useState<any[]>([])
   const [existingOrder, setExistingOrder] = useState<any>(null)
   const [orderStatus, setOrderStatus] = useState<string>('pending')
@@ -33,9 +34,15 @@ export default function LandingPageGourmetFinal() {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
+    
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
-    const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    
+    // Mensagem incluindo Observações
+    const obsMsg = order.observations ? `\n📝 *Obs:* ${order.observations}` : "";
+    
+    const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}${obsMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
@@ -119,6 +126,7 @@ export default function LandingPageGourmetFinal() {
       if (pending) {
         setExistingOrder(pending);
         setOrderStatus(pending.status);
+        setObservations(pending.observations || ''); // Recupera obs se existir
         if (Array.isArray(pending.selected_variations)) {
           setItemsList(pending.selected_variations);
           setStep('concluido');
@@ -135,7 +143,19 @@ export default function LandingPageGourmetFinal() {
   const concluirPedido = async () => {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
     setLoading(true);
-    const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending' };
+    
+    // Adicionado campo observations no objeto de dados
+    const orderData = { 
+      campaign_id: id, 
+      product_id: product.id, 
+      buyer_contact: contact, 
+      buyer_name: buyerName, 
+      buyer_apto: buyerApto, 
+      quantity: 1, 
+      selected_variations: itemsList, 
+      status: 'pending',
+      observations: observations 
+    };
     
     let savedOrder;
     if (existingOrder && orderStatus !== 'paid' && orderStatus !== 'cancelled') { 
@@ -162,6 +182,7 @@ export default function LandingPageGourmetFinal() {
       setExistingOrder(null);
       setOrderStatus('pending');
       setItemsList([]);
+      setObservations('');
       setStep('itens');
     } catch (e) { alert("Erro ao cancelar"); }
     finally { setLoading(false); }
@@ -185,7 +206,6 @@ export default function LandingPageGourmetFinal() {
     setUploading(false);
   };
 
-  // --- COMPONENTES AUXILIARES ---
   const InfoBadge = ({label, value}: {label: string, value: string}) => (
     <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
       <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</p>
@@ -211,7 +231,6 @@ export default function LandingPageGourmetFinal() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* CABEÇALHO */}
         <div style={{ height: '140px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -219,7 +238,6 @@ export default function LandingPageGourmetFinal() {
           </div>
         </div>
 
-        {/* BARRA DE INFOS RÁPIDAS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -234,11 +252,9 @@ export default function LandingPageGourmetFinal() {
             </div>
           )}
 
-          {/* DESCRIÇÃO E VENDEDOR */}
           <div style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: '0 0 10px 0' }}>{campaign?.description}</p>
             
-            {/* NOVO: INFO VENDEDOR */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900 }}>
@@ -301,6 +317,19 @@ export default function LandingPageGourmetFinal() {
                         </div> 
                       ))}
                       <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16, marginTop: 5 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
+                      
+                      {/* NOVO: CAMPO DE OBSERVAÇÕES */}
+                      <div style={{marginTop: 15}}>
+                        <p style={{fontSize: 10, fontWeight: 900, color: '#059669', marginBottom: 5, textTransform: 'uppercase'}}>Observações do Pedido:</p>
+                        <textarea 
+                          placeholder="Ex: Entregar na portaria, ponto da carne, etc..." 
+                          style={{width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #bbf7d0', fontSize: '13px', outline: 'none', fontFamily: 'inherit', resize: 'none'}}
+                          rows={2}
+                          value={observations}
+                          onChange={(e) => setObservations(e.target.value)}
+                        />
+                      </div>
+
                       <button onClick={() => setStep('dados')} style={btnStyle}>FINALIZAR PEDIDO</button>
                     </div>
                   )}
@@ -340,7 +369,7 @@ export default function LandingPageGourmetFinal() {
 
               {orderStatus === 'paid' ? (
                 <button 
-                  onClick={() => { if(isExpired) return alert("Encerrada"); setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setStep('itens'); }} 
+                  onClick={() => { if(isExpired) return alert("Encerrada"); setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens'); }} 
                   style={{ ...btnStyle, backgroundColor: '#000', opacity: isExpired ? 0.5 : 1 }}
                 >
                   {isExpired ? 'Encerrada' : 'Fazer Novo Pedido'}
