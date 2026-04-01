@@ -22,6 +22,29 @@ export default function PortalCondominio() {
 
   // CORREÇÃO DO USEEFFECT: Usando async/await interno para evitar erro de .catch()
   useEffect(() => {
+
+// Checagem de segurança: as chaves chegaram no browser?
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setConfigError("Erro de Configuração: Chaves do Supabase não encontradas na Vercel.");
+    }
+    
+    async function checkSession() {
+      // ... resto da função checkSession igual ...
+    }
+    checkSession();
+  }, []);
+
+  // Se houver erro de config, mostra na tela em vez de quebrar
+  if (configError) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'red', fontFamily: 'sans-serif' }}>
+        <h1 style={{fontWeight: 900}}>ERRO DE SISTEMA</h1>
+        <p>{configError}</p>
+        <p style={{color: '#666', fontSize: 10}}>Verifique Environment Variables na Vercel.</p>
+      </div>
+    )
+  }
+
     async function checkSession() {
       const savedPhone = localStorage.getItem('user_phone');
       const savedId = localStorage.getItem('user_id');
