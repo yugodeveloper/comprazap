@@ -59,18 +59,20 @@ export default function GestaoCampanha() {
     }
   }
 
-  // --- LÓGICA DE WHATSAPP ---
+  // --- LÓGICA DE WHATSAPP MELHORADA ---
   const getWhatsAppLink = (order: any) => {
     const cleanPhone = order.buyer_contact.replace(/\D/g, "");
-    const campaignUrl = `${window.location.origin}/c/${id}`;
+    const campaignUrl = `${window.location.origin}/c/${id}?w=${cleanPhone}`;
     let message = "";
 
     if (order.status === 'paid') {
-      message = `Olá ${order.buyer_name}! Recebi seu pagamento do *${campaign?.title}*. Tudo certo! Obrigado. ✅`;
+      message = `Olá ${order.buyer_name}! Recebi seu pagamento do *${campaign?.title}*. Tudo certo! Acompanhe por aqui: 👉 ${campaignUrl}`;
     } else if (order.status === 'rejected') {
       message = `Olá ${order.buyer_name}! Tivemos um problema com seu comprovante no *${campaign?.title}*. Poderia enviar novamente pelo link? 👉 ${campaignUrl}`;
+    } else if (order.status === 'cancelled') {
+      message = `Olá ${order.buyer_name}! Vi que seu pedido do *${campaign?.title}* foi cancelado. Se desejar pedir novamente, acesse: 👉 ${campaignUrl}`;
     } else if (order.receipt_url) {
-      message = `Olá ${order.buyer_name}! Já recebi seu comprovante do *${campaign?.title}* e estou validando. Em breve te aviso! ⏳`;
+      message = `Olá ${order.buyer_name}! Já recebi seu comprovante do *${campaign?.title}* e estou validando. Em breve te aviso! Acompanhe: 👉 ${campaignUrl}`;
     } else {
       message = `Olá ${order.buyer_name}! Vi que você iniciou um pedido no *${campaign?.title}* mas ainda não enviou o comprovante. Pode finalizar por aqui? 👉 ${campaignUrl}`;
     }
@@ -140,7 +142,7 @@ export default function GestaoCampanha() {
                   <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>VIEWS</p>
                 </div>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '15px' }}>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#059669' }}>{orders.length}</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#059669' }}>{orders.filter(o => o.status !== 'cancelled').length}</p>
                   <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>PEDIDOS</p>
                 </div>
                 <div style={{ backgroundColor: '#0c0a09', padding: '10px', borderRadius: '15px' }}>
@@ -152,23 +154,24 @@ export default function GestaoCampanha() {
 
             <div style={{ marginTop: '20px' }}>
               {orders.map(order => (
-                <div key={order.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div key={order.id} style={{ ...cardStyle, opacity: order.status === 'cancelled' ? 0.6 : 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '14px' }}>{order.buyer_name}</p>
                       <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#a8a29e' }}>Unidade {order.buyer_apto}</p>
                       <a 
                         href={getWhatsAppLink(order)} 
                         target="_blank" 
+                        rel="noreferrer"
                         style={{ fontSize: '11px', color: '#059669', fontWeight: 'bold', textDecoration: 'none', display: 'block', marginTop: '4px' }}
                       >
                         📱 {order.buyer_contact}
                       </a>
                     </div>
                     <div style={{ fontSize: '8px', fontWeight: '900', padding: '4px 10px', borderRadius: '50px', 
-                      backgroundColor: order.status === 'paid' ? '#dcfce7' : order.status === 'rejected' ? '#fee2e2' : '#fef9c3', 
-                      color: order.status === 'paid' ? '#166534' : order.status === 'rejected' ? '#991b1b' : '#854d0e' }}>
-                      {order.status === 'paid' ? 'PAGO' : order.status === 'rejected' ? 'RECUSADO' : 'AGUARDANDO'}
+                      backgroundColor: order.status === 'paid' ? '#dcfce7' : order.status === 'rejected' ? '#fee2e2' : order.status === 'cancelled' ? '#f5f5f4' : '#fef9c3', 
+                      color: order.status === 'paid' ? '#166534' : order.status === 'rejected' ? '#991b1b' : order.status === 'cancelled' ? '#a8a29e' : '#854d0e' }}>
+                      {order.status.toUpperCase()}
                     </div>
                   </div>
 
@@ -176,7 +179,7 @@ export default function GestaoCampanha() {
                     {Array.isArray(order.selected_variations) && order.selected_variations.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
                   </div>
 
-                  {order.receipt_url && (
+                  {order.receipt_url && order.status !== 'cancelled' && (
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' }}>
                       <div onClick={() => setSelectedImg(order.receipt_url)} style={{ width: '60px', height: '60px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #059669', cursor: 'pointer' }}>
                         <img src={order.receipt_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Pix" />
@@ -185,7 +188,7 @@ export default function GestaoCampanha() {
                     </div>
                   )}
 
-                  {order.status !== 'paid' && order.receipt_url && (
+                  {order.status === 'pending' && order.receipt_url && (
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => handleStatus(order.id, 'paid')} style={btnEmerald}>CONFIRMAR PIX</button>
                       <button onClick={() => handleStatus(order.id, 'rejected')} style={{ ...btnEmerald, backgroundColor: '#ef4444', width: 'auto', padding: '14px 20px' }}>✖</button>
@@ -197,9 +200,8 @@ export default function GestaoCampanha() {
           </>
         )}
 
-        {/* MODAL DA FOTO */}
         {selectedImg && (
-          <div onClick={() => setSelectedImg(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div onClick={() => setSelectedImg(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
             <img src={selectedImg} style={{ maxWidth: '100%', maxHeight: '90%', borderRadius: '15px', boxShadow: '0 0 30px rgba(0,0,0,0.5)' }} />
           </div>
         )}

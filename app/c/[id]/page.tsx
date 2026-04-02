@@ -1,13 +1,16 @@
 'use client'
 
 import { supabase } from '../../lib/supabase'
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 
-export default function LandingPageGourmetFinal() {
+// Componente interno para lidar com searchParams (exigência do Next.js para build)
+function LandingContent() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const id = params?.id as string
+  const autoPhone = searchParams.get('w')
   
   const [campaign, setCampaign] = useState<any>(null)
   const [product, setProduct] = useState<any>(null)
@@ -50,7 +53,43 @@ export default function LandingPageGourmetFinal() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
-  // --- 🔴 INTEGRAÇÃO TELEGRAM RESTAURADA ---
+  // --- LÓGICA DE IDENTIFICAÇÃO (Separada para ser chamada pelo AutoLogin) ---
+  const identificarUsuario = async (phoneToAuth: string) => {
+    setLoading(true);
+    try {
+      const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
+      const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false }).limit(1).maybeSingle();
+
+      if (orders && orders.length > 0) {
+        const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
+        setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
+        if (pending) {
+          setExistingOrder(pending); setOrderStatus(pending.status); setObservations(pending.observations || '');
+          setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
+          if (Array.isArray(pending.selected_variations)) {
+            setItemsList(pending.selected_variations); setStep('concluido');
+            return;
+          }
+        }
+      }
+      if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
+      setStep('itens');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- AUTO LOGIN PELO PARÂMETRO 'W' ---
+  useEffect(() => {
+    if (autoPhone && id && !loading) {
+      const masked = maskPhone(autoPhone);
+      setContact(masked);
+      identificarUsuario(masked);
+    }
+  }, [autoPhone, id, loading]);
+
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -114,26 +153,6 @@ export default function LandingPageGourmetFinal() {
     } catch (e) { setError(true); } finally { setLoading(false); }
   }
 
-  const handleIdentificacao = async () => {
-    if (contact.length < 14) return alert("WhatsApp inválido");
-    setLoading(true);
-    const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', contact).order('created_at', { ascending: false });
-    const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', contact).order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (orders && orders.length > 0) {
-      const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
-      setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
-      if (pending) {
-        setExistingOrder(pending); setOrderStatus(pending.status); setObservations(pending.observations || '');
-        setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
-        if (Array.isArray(pending.selected_variations)) {
-          setItemsList(pending.selected_variations); setStep('concluido'); setLoading(false); return;
-        }
-      }
-    }
-    if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
-    setStep('itens'); setLoading(false);
-  };
-
   const concluirPedido = async () => {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
     setLoading(true);
@@ -147,10 +166,7 @@ export default function LandingPageGourmetFinal() {
       savedOrder = data; 
     }
     setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
-    
-    // CHAMADA DO TELEGRAM RESTAURADA
     await enviarNotificacaoTelegram(savedOrder, itemsList);
-    
     setStep('concluido'); setLoading(false);
   };
 
@@ -176,10 +192,7 @@ export default function LandingPageGourmetFinal() {
       setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
       setOrderStatus('pending');
       const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
-      
-      // CHAMADA DO TELEGRAM PARA COMPROVANTE RESTAURADA
       await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id, total);
-      
       alert("Comprovante enviado! ✅");
     }
     setUploading(false);
@@ -196,7 +209,7 @@ export default function LandingPageGourmetFinal() {
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', fontSize: '16px' };
 
-  if (loading) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando...</div>
+  if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando...</div>
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
@@ -216,6 +229,7 @@ export default function LandingPageGourmetFinal() {
         </div>
 
         <div style={{ padding: '15px 20px' }}>
+          
           <div style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: '0 0 10px 0' }}>{campaign?.description}</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
@@ -231,12 +245,12 @@ export default function LandingPageGourmetFinal() {
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
-              <button onClick={handleIdentificacao} style={btnStyle}>ACESSAR OFERTA</button>
+              <button onClick={() => identificarUsuario(contact)} style={btnStyle}>ACESSAR OFERTA</button>
             </div>
           )}
 
           {(step !== 'identificacao') && (
-            <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
+            <div style={{ backgroundColor: '#059669', color: white, padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{fontSize: '11px'}}>
                       <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
@@ -302,11 +316,8 @@ export default function LandingPageGourmetFinal() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
-              
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
-                  </div>
+                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0' }}>CONFERIR ITENS SELECIONADOS</p>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
@@ -326,7 +337,6 @@ export default function LandingPageGourmetFinal() {
               <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#475569', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold', fontSize: 13 }}>
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '⚠️ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
-              
               {orderStatus === 'paid' ? (
                 <div style={{ background: 'white', padding: 30, borderRadius: 30, border: '2px solid #059669', marginBottom: 20 }}>
                   <p style={{ fontWeight: 900, fontSize: 18, color: '#059669' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)} confirmado no Pix {campaign?.pix_key}</p>
@@ -341,7 +351,6 @@ export default function LandingPageGourmetFinal() {
                   </div>
                 </div>
               )}
-
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginBottom: '20px' }}>
                   <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0', textAlign: 'center' }}>DETALHES DO PEDIDO</p>
                   {itemsList.map((item) => (
@@ -358,7 +367,6 @@ export default function LandingPageGourmetFinal() {
                     <span style={{ color: '#059669', fontSize: '16px' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</span>
                   </div>
               </div>
-
               {orderStatus === 'paid' ? (
                 <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
               ) : (
@@ -374,4 +382,13 @@ export default function LandingPageGourmetFinal() {
       </div>
     </div>
   );
+}
+
+// Wrapper para Suspense (obrigatório para useSearchParams)
+export default function LandingPageSuspense() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <LandingContent />
+    </Suspense>
+  )
 }
