@@ -13,7 +13,7 @@ export default function GestaoCampanha() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedImg, setSelectedImg] = useState<string | null>(null)
-  const [showReport, setShowReport] = useState(false) // Estado para o Relatório
+  const [showReport, setShowReport] = useState(false)
 
   const fetchData = async () => {
     if (!id) return
@@ -59,10 +59,27 @@ export default function GestaoCampanha() {
     }
   }
 
-  // --- LÓGICA DO RELATÓRIO ---
+  // --- LÓGICA DE WHATSAPP ---
+  const getWhatsAppLink = (order: any) => {
+    const cleanPhone = order.buyer_contact.replace(/\D/g, "");
+    const campaignUrl = `${window.location.origin}/c/${id}`;
+    let message = "";
+
+    if (order.status === 'paid') {
+      message = `Olá ${order.buyer_name}! Recebi seu pagamento do *${campaign?.title}*. Tudo certo! Obrigado. ✅`;
+    } else if (order.status === 'rejected') {
+      message = `Olá ${order.buyer_name}! Tivemos um problema com seu comprovante no *${campaign?.title}*. Poderia enviar novamente pelo link? 👉 ${campaignUrl}`;
+    } else if (order.receipt_url) {
+      message = `Olá ${order.buyer_name}! Já recebi seu comprovante do *${campaign?.title}* e estou validando. Em breve te aviso! ⏳`;
+    } else {
+      message = `Olá ${order.buyer_name}! Vi que você iniciou um pedido no *${campaign?.title}* mas ainda não enviou o comprovante. Pode finalizar por aqui? 👉 ${campaignUrl}`;
+    }
+
+    return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+  }
+
   const pedidosPagos = orders.filter(o => o.status === 'paid');
   
-  // Total de itens por tipo (para produção)
   const resumoProducao: Record<string, number> = {};
   pedidosPagos.forEach(order => {
     if (Array.isArray(order.selected_variations)) {
@@ -72,90 +89,107 @@ export default function GestaoCampanha() {
     }
   });
 
-  const cardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '32px', border: '1px solid #f5f5f4', marginBottom: '15px' };
-  const btnEmerald: React.CSSProperties = { width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '12px', textTransform: 'uppercase', cursor: 'pointer', letterSpacing: '1px' };
+  const cardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '25px', border: '1px solid #f5f5f4', marginBottom: '15px' };
+  const btnEmerald: React.CSSProperties = { width: '100%', padding: '14px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '11px', textTransform: 'uppercase', cursor: 'pointer' };
 
-  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p>Carregando...</p></div>
+  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p>Carregando Gestão...</p></div>
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '20px', fontFamily: 'sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '15px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto' }}>
         
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-          <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase' }}>← Voltar</button>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase' }}>← Painel</button>
           <button onClick={() => setShowReport(!showReport)} style={{ fontSize: '9px', fontWeight: '900', backgroundColor: showReport ? '#ef4444' : '#059669', color: 'white', padding: '8px 15px', borderRadius: '50px', border: 'none' }}>
-            {showReport ? 'FECHAR RELATÓRIO' : 'GERAR RELATÓRIO 📋'}
+            {showReport ? 'FECHAR RELATÓRIO' : 'RELATÓRIO DE ENTREGAS 📋'}
           </button>
         </header>
 
         {showReport ? (
-          /* --- TELA DE RELATÓRIO DE ENTREGAS --- */
-          <div style={{ animation: 'fadein 0.5s' }}>
+          <div style={{ animation: 'fadein 0.3s' }}>
             <div style={{ ...cardStyle, border: '2px solid #059669' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', marginBottom: '20px' }}>Lista de Produção</h2>
+              <h2 style={{ fontSize: '16px', fontWeight: '900', marginBottom: '15px' }}>Lista de Produção</h2>
               {Object.entries(resumoProducao).map(([name, qty]) => (
-                <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f5f5f4' }}>
-                  <span style={{ fontWeight: 'bold' }}>{name}</span>
+                <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f5f5f4' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{name}</span>
                   <span style={{ fontWeight: '900', color: '#059669' }}>{qty} un.</span>
                 </div>
               ))}
             </div>
 
-            <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase', margin: '30px 0 15px 15px' }}>Entregas por Morador</h2>
+            <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase', margin: '20px 0 10px 10px' }}>Roteiro de Entrega</h2>
             {pedidosPagos.map(order => (
-              <div key={order.id} style={{ ...cardStyle, padding: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f5f5f4', paddingBottom: '10px', marginBottom: '10px' }}>
-                  <span style={{ fontWeight: '900' }}>{order.buyer_apto}</span>
+              <div key={order.id} style={{ ...cardStyle, padding: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f5f5f4', paddingBottom: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: '900', color: '#059669' }}>{order.buyer_apto}</span>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>{order.buyer_name}</span>
                 </div>
                 {Array.isArray(order.selected_variations) && order.selected_variations.map((item: any, idx: number) => (
-                  <div key={idx} style={{ fontSize: '13px', padding: '2px 0' }}>• {item.qty}x {item.name}</div>
+                  <div key={idx} style={{ fontSize: '12px', padding: '2px 0' }}>• {item.qty}x {item.name}</div>
                 ))}
               </div>
             ))}
           </div>
         ) : (
-          /* --- TELA DE GESTÃO NORMAL --- */
           <>
             <div style={{ ...cardStyle, textAlign: 'center' }}>
-              <h1 style={{ fontSize: '24px', fontWeight: '900', fontStyle: 'italic', marginBottom: '20px' }}>{campaign?.title}</h1>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                <div style={{ backgroundColor: '#f5f5f4', padding: '15px', borderRadius: '20px' }}>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '18px' }}>{campaign?.views || 0}</p>
-                  <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: '#a8a29e' }}>VIEWS</p>
+              <h1 style={{ fontSize: '20px', fontWeight: '900', marginBottom: '15px' }}>{campaign?.title}</h1>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                <div style={{ backgroundColor: '#f5f5f4', padding: '10px', borderRadius: '15px' }}>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px' }}>{campaign?.views || 0}</p>
+                  <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>VIEWS</p>
                 </div>
-                <div style={{ backgroundColor: '#f0fdf4', padding: '15px', borderRadius: '20px' }}>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#059669' }}>{orders.length}</p>
-                  <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: '#a8a29e' }}>PEDIDOS</p>
+                <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '15px' }}>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#059669' }}>{orders.length}</p>
+                  <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>PEDIDOS</p>
                 </div>
-                <div style={{ backgroundColor: '#0c0a09', padding: '15px', borderRadius: '20px' }}>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: 'white' }}>{pedidosPagos.length}</p>
-                  <p style={{ margin: 0, fontSize: '8px', fontWeight: '900', color: '#a8a29e' }}>PAGOS</p>
+                <div style={{ backgroundColor: '#0c0a09', padding: '10px', borderRadius: '15px' }}>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: 'white' }}>{pedidosPagos.length}</p>
+                  <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>PAGOS</p>
                 </div>
               </div>
             </div>
 
-            <div style={{ marginTop: '30px' }}>
+            <div style={{ marginTop: '20px' }}>
               {orders.map(order => (
                 <div key={order.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div>
-                      <p style={{ margin: 0, fontWeight: '900', fontSize: '15px' }}>{order.buyer_name}</p>
-                      <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#a8a29e' }}>{order.buyer_apto}</p>
+                      <p style={{ margin: 0, fontWeight: '900', fontSize: '14px' }}>{order.buyer_name}</p>
+                      <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#a8a29e' }}>Unidade {order.buyer_apto}</p>
+                      <a 
+                        href={getWhatsAppLink(order)} 
+                        target="_blank" 
+                        style={{ fontSize: '11px', color: '#059669', fontWeight: 'bold', textDecoration: 'none', display: 'block', marginTop: '4px' }}
+                      >
+                        📱 {order.buyer_contact}
+                      </a>
                     </div>
-                    <div style={{ fontSize: '9px', fontWeight: '900', padding: '5px 12px', borderRadius: '50px', backgroundColor: order.status === 'paid' ? '#dcfce7' : '#fef9c3', color: order.status === 'paid' ? '#166534' : '#854d0e' }}>
-                      {order.status === 'paid' ? 'APROVADO' : 'PENDENTE'}
+                    <div style={{ fontSize: '8px', fontWeight: '900', padding: '4px 10px', borderRadius: '50px', 
+                      backgroundColor: order.status === 'paid' ? '#dcfce7' : order.status === 'rejected' ? '#fee2e2' : '#fef9c3', 
+                      color: order.status === 'paid' ? '#166534' : order.status === 'rejected' ? '#991b1b' : '#854d0e' }}>
+                      {order.status === 'paid' ? 'PAGO' : order.status === 'rejected' ? 'RECUSADO' : 'AGUARDANDO'}
                     </div>
                   </div>
 
+                  <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px', padding: '8px', backgroundColor: '#fafaf9', borderRadius: '10px' }}>
+                    {Array.isArray(order.selected_variations) && order.selected_variations.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
+                  </div>
+
                   {order.receipt_url && (
-                    <div onClick={() => setSelectedImg(order.receipt_url)} style={{ width: '80px', height: '80px', borderRadius: '15px', overflow: 'hidden', border: '2px solid #059669', cursor: 'pointer', marginBottom: '15px' }}>
-                      <img src={order.receipt_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' }}>
+                      <div onClick={() => setSelectedImg(order.receipt_url)} style={{ width: '60px', height: '60px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #059669', cursor: 'pointer' }}>
+                        <img src={order.receipt_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Pix" />
+                      </div>
+                      <p style={{ fontSize: '9px', color: '#a8a29e' }}>Clique na imagem<br/>para ampliar</p>
                     </div>
                   )}
 
                   {order.status !== 'paid' && order.receipt_url && (
-                    <button onClick={() => handleStatus(order.id, 'paid')} style={btnEmerald}>CONFIRMAR PAGAMENTO</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleStatus(order.id, 'paid')} style={btnEmerald}>CONFIRMAR PIX</button>
+                      <button onClick={() => handleStatus(order.id, 'rejected')} style={{ ...btnEmerald, backgroundColor: '#ef4444', width: 'auto', padding: '14px 20px' }}>✖</button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -165,8 +199,8 @@ export default function GestaoCampanha() {
 
         {/* MODAL DA FOTO */}
         {selectedImg && (
-          <div onClick={() => setSelectedImg(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <img src={selectedImg} style={{ maxWidth: '90%', maxHeight: '80%', borderRadius: '20px' }} />
+          <div onClick={() => setSelectedImg(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+            <img src={selectedImg} style={{ maxWidth: '100%', maxHeight: '90%', borderRadius: '15px', boxShadow: '0 0 30px rgba(0,0,0,0.5)' }} />
           </div>
         )}
 
