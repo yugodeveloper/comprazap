@@ -5,7 +5,6 @@ import { useEffect, useState, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 
-// Componente interno para lidar com searchParams (exigência do Next.js para build)
 function LandingContent() {
   const params = useParams()
   const searchParams = useSearchParams()
@@ -53,7 +52,6 @@ function LandingContent() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
-  // --- LÓGICA DE IDENTIFICAÇÃO (Separada para ser chamada pelo AutoLogin) ---
   const identificarUsuario = async (phoneToAuth: string) => {
     setLoading(true);
     try {
@@ -81,14 +79,16 @@ function LandingContent() {
     }
   };
 
-  // --- AUTO LOGIN PELO PARÂMETRO 'W' ---
   useEffect(() => {
     if (autoPhone && id && !loading) {
-      const masked = maskPhone(autoPhone);
-      setContact(masked);
-      identificarUsuario(masked);
+      const cleanAuto = autoPhone.replace(/\D/g, "");
+      if (cleanAuto.length >= 10) {
+        const masked = maskPhone(cleanAuto);
+        setContact(masked);
+        identificarUsuario(masked);
+      }
     }
-  }, [autoPhone, id, loading]);
+  }, [autoPhone, id]);
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
@@ -229,7 +229,6 @@ function LandingContent() {
         </div>
 
         <div style={{ padding: '15px 20px' }}>
-          
           <div style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.4', margin: '0 0 10px 0' }}>{campaign?.description}</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
@@ -250,7 +249,7 @@ function LandingContent() {
           )}
 
           {(step !== 'identificacao') && (
-            <div style={{ backgroundColor: '#059669', color: white, padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
+            <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{fontSize: '11px'}}>
                       <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
@@ -316,8 +315,11 @@ function LandingContent() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
+              
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0' }}>CONFERIR ITENS SELECIONADOS</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
+                  </div>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
@@ -337,6 +339,7 @@ function LandingContent() {
               <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#475569', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold', fontSize: 13 }}>
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '⚠️ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
+              
               {orderStatus === 'paid' ? (
                 <div style={{ background: 'white', padding: 30, borderRadius: 30, border: '2px solid #059669', marginBottom: 20 }}>
                   <p style={{ fontWeight: 900, fontSize: 18, color: '#059669' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)} confirmado no Pix {campaign?.pix_key}</p>
@@ -351,6 +354,7 @@ function LandingContent() {
                   </div>
                 </div>
               )}
+
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginBottom: '20px' }}>
                   <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0', textAlign: 'center' }}>DETALHES DO PEDIDO</p>
                   {itemsList.map((item) => (
@@ -367,6 +371,7 @@ function LandingContent() {
                     <span style={{ color: '#059669', fontSize: '16px' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</span>
                   </div>
               </div>
+
               {orderStatus === 'paid' ? (
                 <button onClick={() => { setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens'); }} style={{ ...btnStyle, backgroundColor: '#000' }}>Fazer Novo Pedido</button>
               ) : (
@@ -384,10 +389,9 @@ function LandingContent() {
   );
 }
 
-// Wrapper para Suspense (obrigatório para useSearchParams)
 export default function LandingPageSuspense() {
   return (
-    <Suspense fallback={<div>Carregando...</div>}>
+    <Suspense fallback={<div style={{textAlign:'center', marginTop:100}}>Carregando...</div>}>
       <LandingContent />
     </Suspense>
   )
