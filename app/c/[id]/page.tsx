@@ -52,7 +52,9 @@ function LandingContent() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
+  // --- LÓGICA DE IDENTIFICAÇÃO (Melhorada para aceitar parâmetro direto) ---
   const identificarUsuario = async (phoneToAuth: string) => {
+    if (!phoneToAuth || phoneToAuth.length < 10) return;
     setLoading(true);
     try {
       const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
@@ -66,6 +68,7 @@ function LandingContent() {
           setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
           if (Array.isArray(pending.selected_variations)) {
             setItemsList(pending.selected_variations); setStep('concluido');
+            setLoading(false);
             return;
           }
         }
@@ -79,16 +82,17 @@ function LandingContent() {
     }
   };
 
+  // --- AUTO LOGIN ATUALIZADO ---
   useEffect(() => {
-    if (autoPhone && id && !loading) {
+    if (autoPhone && id && campaign) { // Espera a campanha carregar para evitar bugs de id
       const cleanAuto = autoPhone.replace(/\D/g, "");
       if (cleanAuto.length >= 10) {
         const masked = maskPhone(cleanAuto);
         setContact(masked);
-        identificarUsuario(masked);
+        identificarUsuario(masked); // Chama a função imediatamente
       }
     }
-  }, [autoPhone, id]);
+  }, [autoPhone, id, campaign]); // Adicionado campaign como dependência
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
@@ -214,7 +218,6 @@ function LandingContent() {
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
-        
         <div style={{ height: '140px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -315,11 +318,8 @@ function LandingContent() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
-              
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
-                  </div>
+                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
@@ -350,7 +350,7 @@ function LandingContent() {
                   <p style={{ fontWeight: 900, fontSize: 20, color: '#059669', margin: '10px 0' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f8fafc', padding: '8px 12px', borderRadius: 8 }}>
                     <span style={{ fontSize: 10, wordBreak: 'break-all', color: '#64748b' }}>{campaign?.pix_key}</span>
-                    <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900 }}>COPIAR</button>
+                    <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900, cursor: 'pointer' }}>COPIAR</button>
                   </div>
                 </div>
               )}
