@@ -1,7 +1,7 @@
-# 🛒 CompraZap - Manifesto do Projeto v16.0
+# 🛒 CompraZap - Manifesto do Projeto v17.0
 
 ## 📌 Visão Geral
-Plataforma de micro-vendas para condomínios. Foco em UX mobile-first, automação via Telegram e confiança entre vizinhos através da identificação clara do vendedor e prova social.
+Plataforma de micro-vendas para condomínios. Foco em UX mobile-first sem scroll excessivo, automação via Telegram e transparência total no fluxo de checkout para vizinhos.
 
 ---
 
@@ -9,40 +9,49 @@ Plataforma de micro-vendas para condomínios. Foco em UX mobile-first, automaç�
 - **Frontend:** Next.js 16.2.1 (App Router) - Tailwind / Inline CSS.
 - **Backend:** Supabase (PostgreSQL + Auth).
 - **Interatividade:** Telegram Bot API (@8625189600).
-- **Segurança:** Bloqueio de duplicidade via `maybeSingle()` e tratamento de erros de rede com `try/catch`.
+- **Segurança:** Máscaras de entrada (Regex) e tratamento de tipos JSONB para Arrays de variações.
 
 ---
 
-## 📂 Estrutura de Dados (Atualizada)
-| Tabela | Campo Novo | Descrição |
+## 📂 Estrutura de Dados (Consolidada)
+| Tabela | Campo / Status | Descrição |
 | :--- | :--- | :--- |
-| **orders** | `observations` (TEXT) | Notas especiais (ex: "sem cebola", "portaria"). |
-| **orders** | `status` (Enum) | Adicionado status `cancelled`. |
-| **campaigns**| `expires_at` | Lógica de encerramento retroativo (ontem) implementada. |
+| **orders** | `observations` (TEXT) | Notas especiais inseridas pelo comprador na vitrine. |
+| **orders** | `status` (Enum) | Estados: `pending`, `paid`, `rejected`, `cancelled`. |
+| **campaigns**| `expires_at` | Data limite para novas compras (bloqueio automático). |
 
 ---
 
-## ✅ Fluxo de UX Implementado (v16.0)
-1. **Identificação:** WhatsApp + Recuperação automática de Nome/Apto de pedidos globais anteriores.
-2. **Vitrine Gourmet:** - Exibição de Local (Condomínio), Data de Expiração e Prova Social ("X vizinhos já pediram").
-   - Card do Vendedor com link direto para o WhatsApp de suporte.
-3. **Seleção & Obs:** O comprador monta a lista e pode adicionar observações por escrito.
-4. **Gestão de Pedido:** - Opção de **Cancelar Pedido** antes do envio do comprovante (limpa o estado e libera para nova compra).
-   - Edição de itens bloqueada após o upload do comprovante para segurança do vendedor.
+## ✅ Fluxo de UX Implementado (v17.0)
+1. **Identificação Inteligente:**
+   - Input de WhatsApp com máscara automática `(XX) XXXXX-XXXX`.
+   - Badge de identificação persistente (Nome, Apto, Tel) com opção **"Alterar"** para reset de sessão.
+2. **Vitrine & Seleção:**
+   - Exibição de Local, Validade e Prova Social (Contagem real de compradores).
+   - Preços em destaque visual (Cor Emerald, Negrito).
+   - Histórico retrátil de **"Pedidos Anteriores desta Campanha"** integrado ao topo da vitrine.
+3. **Checkout Transparente:**
+   - Resumo do pedido persistente durante o preenchimento de dados de entrega e na tela de pagamento.
+   - Opção de **Alterar Pedido** disponível até o último momento antes da confirmação.
+4. **Pagamento & Notificação:**
+   - QR Code dinâmico + Botão **"Copiar Chave Pix"**.
+   - Pós-pagamento: Ocultação do QR Code e mensagem de confirmação de valor pago.
+   - Gatilhos Telegram: Notificação instantânea na **Reserva** e no **Envio do Comprovante**.
 
 ---
 
-## 🛠️ Log de Batalhas & Soluções
-- **Bug n?.variations?.map:** Resolvido com a limpeza de dados no `fetchData` (conversão de String para Array) e proteção `Array.isArray()` no render.
-- **Persistência de Encerramento:** Forçado `expires_at` para 24h atrás no momento do clique para evitar conflitos de fuso horário.
-- **Tela Preta (Vercel):** Corrigido substituindo `.single()` por `.maybeSingle()` e adicionando verificação de variáveis de ambiente no `useEffect` (Dedo-duro de config).
+## 🛠️ Log de Batalhas & Soluções (Últimas Atualizações)
+- **Restauração Telegram:** Reativadas as chamadas `enviarNotificacaoTelegram` e `enviarComprovanteTelegram` que haviam sido perdidas em refatorações de layout.
+- **UX de Conferência:** Implementada a exibição da lista de produtos selecionados logo abaixo do botão "Confirmar Pedido", garantindo que o usuário saiba o que está comprando antes de pagar.
+- **Segurança de Fluxo:** Bloqueio da edição de itens e cancelamento após o envio do comprovante (pedido entra em estado de análise).
 
 ---
 
 ## 🚀 Próximos Passos (Backlog)
 - [ ] **Dashboard do Vendedor:** Página `/dashboard` para gerenciar lista de entregas.
-- [ ] **Filtro por Condomínio:** Preparar o sistema para múltiplos condomínios (Atualmente fixo: Lanai).
+- [ ] **Filtro por Condomínio:** Preparar o sistema para múltiplos condomínios.
 - [ ] **Relatório Consolidado:** Agrupamento de itens para produção (ex: "Total: 15 Cucas").
+- [ ] **Persistência Local:** Garantir que o `LocalStorage` não limpe os itens acidentalmente em caso de refresh na tela de dados.
 
 ---
 

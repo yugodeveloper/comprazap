@@ -63,13 +63,24 @@ export default function PortalCondominio() {
 
   const fetchUserActivity = async (userPhone: string, userId: string) => {
     try {
+      // 1. Campanhas Criadas (Gestão)
       const { data: campaigns } = await supabase
         .from('campaigns')
         .select('*, orders(status, receipt_url)')
         .eq('creator_id', userId)
         .order('created_at', { ascending: false });
 
-      setMyCampaigns(campaigns || [])
+      setMyCampaigns(campaigns || []);
+
+      // 2. Compras Feitas (Histórico como Comprador)
+      const { data: purchases } = await supabase
+        .from('orders')
+        .select('*, campaigns(title, profiles(full_name))')
+        .eq('buyer_contact', userPhone)
+        .order('created_at', { ascending: false });
+
+      setMyPurchases(purchases || []);
+
     } catch (err) {
       console.error("Erro ao carregar atividades:", err);
     }
@@ -197,25 +208,32 @@ export default function PortalCondominio() {
         <header style={{ backgroundColor: 'white', padding: '12px 18px', borderRadius: '18px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
-            <p style={{ margin: 0, fontSize: '8px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>{savedProfile?.unit}</p>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>Unidade {savedProfile?.unit}</p>
           </div>
           <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '8px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
         </header>
 
-        <section>
+        {/* SEÇÃO 1: MINHAS VENDAS (GESTÃO) */}
+        <section style={{marginBottom: '30px'}}>
+          <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS OFERTAS</h3>
           <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {myCampaigns.map(camp => {
               const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
+              const pendingAproval = camp.orders?.filter((o:any) => o.status === 'pending' && o.receipt_url).length || 0;
+              
               return (
                 <div key={camp.id} style={{ backgroundColor: 'white', padding: '10px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f5f5f4', overflow: 'hidden', flexShrink: 0 }}>
                       {camp.image_url && <img src={camp.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
-                      <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
+                      <div style={{display: 'flex', gap: '5px', alignItems: 'center'}}>
+                        <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
+                        {pendingAproval > 0 && <span style={{backgroundColor: '#f59e0b', color: 'white', fontSize: '6px', padding: '2px 4px', borderRadius: '4px', fontWeight: 900}}>🔔 {pendingAproval} AGUARDANDO PIX</span>}
+                      </div>
                     </div>
                     <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#f5f5f4', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>📢</button>
                   </div>
@@ -227,7 +245,7 @@ export default function PortalCondominio() {
                   </div>
 
                   <div style={{ display: 'flex', gap: '4px' }}>
-                    <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR</button>
+                    <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR VENDAS</button>
                     {isExpired ? (
                       <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
                     ) : (
@@ -239,6 +257,29 @@ export default function PortalCondominio() {
             })}
           </div>
         </section>
+
+        {/* SEÇÃO 2: MINHAS COMPRAS (HISTÓRICO) */}
+        {myPurchases.length > 0 && (
+          <section style={{marginBottom: '30px'}}>
+             <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS COMPRAS COM VIZINHOS</h3>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {myPurchases.map(order => (
+                  <div key={order.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{order.campaigns?.title}</p>
+                      <p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>Vendedor: {order.campaigns?.profiles?.full_name?.split(' ')[0]}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: order.status === 'paid' ? '#059669' : '#f59e0b' }}>
+                        {order.status === 'paid' ? 'PAGO ✅' : 'PENDENTE ⏳'}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>{new Date(order.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ))}
+             </div>
+          </section>
+        )}
 
         <footer style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '20px' }}>
           <p style={{ fontSize: '7px', fontWeight: '900', color: '#d6d3d1', letterSpacing: '3px' }}>COMPRAZAP⚡LANAI</p>
