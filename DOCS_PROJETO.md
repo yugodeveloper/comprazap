@@ -1,7 +1,7 @@
-# 🛒 CompraZap - Manifesto do Projeto v17.0
+# 🛒 CompraZap - Manifesto do Projeto v18.0
 
 ## 📌 Visão Geral
-Plataforma de micro-vendas para condomínios. Foco em UX mobile-first sem scroll excessivo, automação via Telegram e transparência total no fluxo de checkout para vizinhos.
+Plataforma de micro-vendas para condomínios. Foco em UX mobile-first, automação via Telegram e agora com foco total em **redução de fricção no checkout** através de links inteligentes e auto-login.
 
 ---
 
@@ -9,52 +9,51 @@ Plataforma de micro-vendas para condomínios. Foco em UX mobile-first sem scroll
 - **Frontend:** Next.js 16.2.1 (App Router) - Tailwind / Inline CSS.
 - **Backend:** Supabase (PostgreSQL + Auth).
 - **Interatividade:** Telegram Bot API (@8625189600).
-- **Segurança:** Máscaras de entrada (Regex) e tratamento de tipos JSONB para Arrays de variações.
+- **Auto-Login:** Uso de SearchParams (`?w=phone`) com wrapper `<Suspense>` para identificação automática de clientes via link do WhatsApp.
 
 ---
 
-## 📂 Estrutura de Dados (Consolidada)
+## 📂 Estrutura de Dados (Atualizada)
 | Tabela | Campo / Status | Descrição |
 | :--- | :--- | :--- |
-| **orders** | `observations` (TEXT) | Notas especiais inseridas pelo comprador na vitrine. |
+| **orders** | `observations` (TEXT) | Notas especiais (ex: "ponto da carne", "portaria"). |
 | **orders** | `status` (Enum) | Estados: `pending`, `paid`, `rejected`, `cancelled`. |
-| **campaigns**| `expires_at` | Data limite para novas compras (bloqueio automático). |
+| **campaigns**| `expires_at` | Lógica de encerramento automático implementada. |
 
 ---
 
-## ✅ Fluxo de UX Implementado (v17.0)
-1. **Identificação Inteligente:**
-   - Input de WhatsApp com máscara automática `(XX) XXXXX-XXXX`.
-   - Badge de identificação persistente (Nome, Apto, Tel) com opção **"Alterar"** para reset de sessão.
-2. **Vitrine & Seleção:**
-   - Exibição de Local, Validade e Prova Social (Contagem real de compradores).
-   - Preços em destaque visual (Cor Emerald, Negrito).
-   - Histórico retrátil de **"Pedidos Anteriores desta Campanha"** integrado ao topo da vitrine.
-3. **Checkout Transparente:**
-   - Resumo do pedido persistente durante o preenchimento de dados de entrega e na tela de pagamento.
-   - Opção de **Alterar Pedido** disponível até o último momento antes da confirmação.
-4. **Pagamento & Notificação:**
-   - QR Code dinâmico + Botão **"Copiar Chave Pix"**.
-   - Pós-pagamento: Ocultação do QR Code e mensagem de confirmação de valor pago.
-   - Gatilhos Telegram: Notificação instantânea na **Reserva** e no **Envio do Comprovante**.
+## ✅ Fluxo de UX Implementado (v18.0)
+
+### 1. Experiência do Comprador (`/c/[id]`)
+- **Link Inteligente:** O link enviado pelo vendedor já carrega o telefone do cliente. O app identifica o parâmetro `?w=`, mascara o número e faz o login automático.
+- **Identificação Persistente:** Badge verde no topo com Nome, Apto e Tel. Opção **"Alterar"** para trocar de usuário.
+- **Histórico Rápido:** Link direto no topo para ver "Pedidos anteriores desta campanha" (abre uma lista retrátil).
+- **Vitrine Dinâmica:** Preços em destaque (Verde Emerald, Negrito) e campo de observações integrado à lista.
+- **Conferência:** Resumo detalhado dos itens aparece na tela de dados e na tela final do Pix.
+
+### 2. Gestão do Vendedor (`/campanha/gestao/[id]`)
+- **Dashboard de Atividade:** Métricas de Views, Pedidos Reais (exclui cancelados) e Pagamentos Confirmados.
+- **Status Visual:** Pedidos cancelados aparecem com opacidade reduzida e etiqueta cinza.
+- **Ações Rápidas:** Botões para Aprovar Pix ou Rejeitar Comprovante.
+- **WhatsApp Dinâmico:** Botão que gera mensagens personalizadas baseadas no status (Cobrança de Pix, Erro no Comprovante, Sucesso ou Recuperação de Cancelados) incluindo o Link Inteligente.
 
 ---
 
-## 🛠️ Log de Batalhas & Soluções (Últimas Atualizações)
-- **Restauração Telegram:** Reativadas as chamadas `enviarNotificacaoTelegram` e `enviarComprovanteTelegram` que haviam sido perdidas em refatorações de layout.
-- **UX de Conferência:** Implementada a exibição da lista de produtos selecionados logo abaixo do botão "Confirmar Pedido", garantindo que o usuário saiba o que está comprando antes de pagar.
-- **Segurança de Fluxo:** Bloqueio da edição de itens e cancelamento após o envio do comprovante (pedido entra em estado de análise).
+## 🛠️ Log de Batalhas & Soluções (Últimas 24h)
+- **Bug de Build (white):** Corrigido erro de sintaxe onde a cor "white" estava sem aspas no objeto de estilo.
+- **Auto-login Fixo:** Implementado `useEffect` monitorando o estado da `campaign` para garantir que o login automático só dispare após o carregamento dos dados do banco.
+- **Sincronia Telegram:** Restabelecidas as notificações de "Novo Pedido" e "Comprovante Enviado" após refatoração de layout.
 
 ---
 
 ## 🚀 Próximos Passos (Backlog)
-- [ ] **Dashboard do Vendedor:** Página `/dashboard` para gerenciar lista de entregas.
-- [ ] **Filtro por Condomínio:** Preparar o sistema para múltiplos condomínios.
-- [ ] **Relatório Consolidado:** Agrupamento de itens para produção (ex: "Total: 15 Cucas").
-- [ ] **Persistência Local:** Garantir que o `LocalStorage` não limpe os itens acidentalmente em caso de refresh na tela de dados.
+- [ ] **Persistência Local:** Garantir que o `LocalStorage` não limpe itens se o usuário der refresh na tela de dados.
+- [ ] **Edição de Campanhas:** Permitir que o vendedor altere título/descrição de uma oferta ativa.
+- [ ] **Múltiplos Condomínios:** Criar o seletor de localização no cadastro do perfil.
 
 ---
 
 ## 🔗 Links e Credenciais
 - **Bot Telegram:** `@8625189600` (CompraZap Alertas)
 - **SQL de Update:** `ALTER TABLE orders ADD COLUMN observations TEXT;`
+- **Exemplo Link Inteligente:** `.../c/ID_DA_CAMPANHA?w=5511999998888`

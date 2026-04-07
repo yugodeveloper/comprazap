@@ -47,12 +47,27 @@ function LandingContent() {
     }
   };
 
+  // --- PERSISTÊNCIA LOCAL DO CARRINHO ---
+  useEffect(() => {
+    const savedCart = localStorage.getItem(`cart_${id}`);
+    if (savedCart && itemsList.length === 0) {
+      setItemsList(JSON.parse(savedCart));
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (itemsList.length > 0) {
+      localStorage.setItem(`cart_${id}`, JSON.stringify(itemsList));
+    }
+  }, [itemsList, id]);
+
   const handleLogout = () => {
+    if(!confirm("Deseja alterar o usuário?")) return;
+    localStorage.removeItem(`cart_${id}`);
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
-  // --- LÓGICA DE IDENTIFICAÇÃO (Melhorada para aceitar parâmetro direto) ---
   const identificarUsuario = async (phoneToAuth: string) => {
     if (!phoneToAuth || phoneToAuth.length < 10) return;
     setLoading(true);
@@ -82,17 +97,16 @@ function LandingContent() {
     }
   };
 
-  // --- AUTO LOGIN ATUALIZADO ---
   useEffect(() => {
-    if (autoPhone && id && campaign) { // Espera a campanha carregar para evitar bugs de id
+    if (autoPhone && id && campaign) {
       const cleanAuto = autoPhone.replace(/\D/g, "");
       if (cleanAuto.length >= 10) {
         const masked = maskPhone(cleanAuto);
         setContact(masked);
-        identificarUsuario(masked); // Chama a função imediatamente
+        identificarUsuario(masked);
       }
     }
-  }, [autoPhone, id, campaign]); // Adicionado campaign como dependência
+  }, [autoPhone, id, campaign]);
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
@@ -101,7 +115,7 @@ function LandingContent() {
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
     const obsMsg = order.observations ? `\n📝 *Obs:* ${order.observations}` : "";
-    const mensagem = `🛒 *NOVO PEDIDO NO COMPRAZAP!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}${obsMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    const mensagem = `🛒 *NOVO PEDIDO!*\n--------------------------------\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}${obsMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n--------------------------------\n📱 *WhatsApp:* ${order.buyer_contact}`;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -169,6 +183,7 @@ function LandingContent() {
       const { data } = await supabase.from('orders').insert(orderData).select().single(); 
       savedOrder = data; 
     }
+    localStorage.removeItem(`cart_${id}`); // Limpa carrinho salvo ao concluir
     setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
     await enviarNotificacaoTelegram(savedOrder, itemsList);
     setStep('concluido'); setLoading(false);
@@ -218,6 +233,7 @@ function LandingContent() {
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
+        
         <div style={{ height: '140px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
           {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
@@ -318,8 +334,11 @@ function LandingContent() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
+              
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
+                  </div>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
@@ -350,7 +369,7 @@ function LandingContent() {
                   <p style={{ fontWeight: 900, fontSize: 20, color: '#059669', margin: '10px 0' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f8fafc', padding: '8px 12px', borderRadius: 8 }}>
                     <span style={{ fontSize: 10, wordBreak: 'break-all', color: '#64748b' }}>{campaign?.pix_key}</span>
-                    <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900, cursor: 'pointer' }}>COPIAR</button>
+                    <button onClick={copyPix} style={{ background: '#059669', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 5, fontSize: 9, fontWeight: 900 }}>COPIAR</button>
                   </div>
                 </div>
               )}
