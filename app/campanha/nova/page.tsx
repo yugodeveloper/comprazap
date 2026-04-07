@@ -8,54 +8,39 @@ export default function NovaCampanha() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   
-  // Campos Principais
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [pixKey, setPixKey] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [maxSales, setMaxSales] = useState('50')
   
-  // Galeria de imagens
-  const [images, setImages] = useState<string[]>([])
+  const [headerImg, setHeaderImg] = useState('')
+  const [gallery, setGallery] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
 
-  // LISTA DE VARIAÇÕES (Tipos e Preços)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
-  const handleUploadImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, isHeader: boolean) => {
     if (!e.target.files || e.target.files.length === 0) return
-    if (images.length >= 5) return alert("Máximo de 5 fotos permitido.")
-
     setUploading(true)
     const files = Array.from(e.target.files)
     
     for (const file of files) {
-      if (images.length >= 5) break
-      
       const fileExt = file.name.split('.').pop()
       const fileName = `campaigns/${Date.now()}-${Math.random()}.${fileExt}`
-      
       const { error: upErr } = await supabase.storage.from('comprovantes').upload(fileName, file)
       
       if (!upErr) {
         const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
-        setImages(prev => [...prev, publicUrl])
-      } else {
-        console.error("Erro upload:", upErr.message)
+        if (isHeader) setHeaderImg(publicUrl)
+        else setGallery(prev => [...prev, publicUrl].slice(0, 5))
       }
     }
     setUploading(false)
   }
 
-  const addVariation = () => {
-    setVariations([...variations, { name: '', price: '' }])
-  }
-
-  const removeVariation = (index: number) => {
-    const newVars = variations.filter((_, i) => i !== index)
-    setVariations(newVars)
-  }
-
+  const addVariation = () => setVariations([...variations, { name: '', price: '' }])
+  const removeVariation = (index: number) => setVariations(variations.filter((_, i) => i !== index))
   const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
     const newVars = [...variations]
     newVars[index][field] = value
@@ -64,133 +49,112 @@ export default function NovaCampanha() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (images.length === 0) return alert("Adicione pelo menos uma foto das cucas!")
+    if (!headerImg) return alert("Adicione uma imagem de capa!")
     setLoading(true)
 
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não identificado. Faça login novamente.")
+      if (!userId) throw new Error("Usuário não identificado.")
 
-      // 1. Criar a Campanha com Galeria
       const { data: camp, error: campErr } = await supabase
         .from('campaigns')
         .insert({
-          title,
-          description,
-          pix_key: pixKey,
-          expires_at: expiresAt,
-          max_sales: parseInt(maxSales),
-          image_url: images[0], // Capa principal
-          image_gallery: images, // Lista completa (JSONB no banco)
-          creator_id: userId,
-          status: 'active'
+          title, description, pix_key: pixKey, expires_at: expiresAt,
+          max_sales: parseInt(maxSales), image_url: headerImg, 
+          image_gallery: gallery, creator_id: userId, status: 'active'
         })
-        .select()
-        .single()
+        .select().single()
 
       if (campErr) throw campErr
 
-      // 2. Formatar Variações
       const formattedVariations = variations.map(v => ({
         name: v.name,
         price: parseFloat(v.price.replace(',', '.'))
       }))
 
-      // 3. Criar o Produto
-      const { error: prodErr } = await supabase
-        .from('products')
-        .insert({
-          campaign_id: camp.id,
-          name: title,
-          price: formattedVariations[0].price,
-          variations: formattedVariations 
-        })
+      await supabase.from('products').insert({
+        campaign_id: camp.id, name: title,
+        price: formattedVariations[0].price,
+        variations: formattedVariations 
+      })
 
-      if (prodErr) throw prodErr
-
-      alert("Campanha de Cucas lançada! 🚀")
+      alert("Oferta de Cucas lançada! 🚀")
       router.push('/')
     } catch (err: any) {
-      alert("Erro: " + err.message)
+      alert(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '15px', backgroundColor: 'white', borderRadius: '15px',
-    border: '1px solid #e2e8f0', outline: 'none', fontSize: '14px', boxSizing: 'border-box'
-  };
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #e2e8f0', fontSize: '14px', boxSizing: 'border-box' };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
-      <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-        
+      <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>Nova Campanha de Cucas ⚡</h1>
+          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>Criar Oferta de Cucas ⚡</h1>
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* SELEÇÃO DE FOTOS (GALERIA) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Fotos do Produto (Máx 5)</label>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Campanha</label>
+            {headerImg ? (
+              <div style={{ width: '100%', height: '120px', borderRadius: '15px', overflow: 'hidden', position: 'relative' }}>
+                <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '25px', height: '25px', cursor: 'pointer' }}>✕</button>
+              </div>
+            ) : (
+              <label style={{ width: '100%', height: '100px', borderRadius: '15px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: 'white' }}>
+                <input type="file" accept="image/*" hidden onChange={(e) => handleUpload(e, true)} disabled={uploading} />
+                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>{uploading ? 'Processando...' : '+ Capa Horizontal'}</span>
+              </label>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Fotos Detalhadas (Carrossel)</label>
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
-                {images.map((img, i) => (
-                  <div key={i} style={{ width: '80px', height: '80px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                    <button type="button" onClick={() => setImages(images.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
+                {gallery.map((img, i) => (
+                  <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px' }}>✕</button>
                   </div>
                 ))}
-                {images.length < 5 && (
-                  <label style={{ width: '80px', height: '80px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor: 'white' }}>
-                    <input type="file" multiple accept="image/*" hidden onChange={handleUploadImages} disabled={uploading} />
-                    <span style={{ fontSize: '20px', color: '#94a3b8' }}>{uploading ? '...' : '+'}</span>
+                {gallery.length < 5 && (
+                  <label style={{ width: '80px', height: '110px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor: 'white' }}>
+                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, false)} disabled={uploading} />
+                    <span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
                   </label>
                 )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <input placeholder="Título (ex: Cuca Alemã de Maçã)" required style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
-            <textarea placeholder="Conte um pouco sobre a cuca..." required style={{ ...inputStyle, height: '80px', resize: 'none' }} value={description} onChange={e => setDescription(e.target.value)} />
-          </div>
+          <input placeholder="Título (ex: Cucas da Vovó)" required style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
+          <textarea placeholder="História, sabores e entregas..." required style={{ ...inputStyle, height: '120px' }} value={description} onChange={e => setDescription(e.target.value)} />
 
-          <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '25px', border: '1px solid #e2e8f0' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '15px', textAlign: 'center' }}>Sabores e Preços</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {variations.map((v, index) => (
-                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input placeholder="Sabor" required style={{ ...inputStyle, padding: '10px', fontSize: '12px' }} value={v.name} onChange={(e) => updateVariation(index, 'name', e.target.value)} />
-                  <input placeholder="R$" required style={{ ...inputStyle, padding: '10px', fontSize: '12px', width: '80px', fontWeight: 'bold', color: '#059669' }} value={v.price} onChange={(e) => updateVariation(index, 'price', e.target.value)} />
-                  {variations.length > 1 && (
-                    <button type="button" onClick={() => removeVariation(index)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
-                  )}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '25px', border: '1px solid #e2e8f0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '15px', textAlign: 'center' }}>Variações de Preço</label>
+            {variations.map((v, index) => (
+                <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <input placeholder="Ex: Sabor" required style={{ ...inputStyle, padding: '10px' }} value={v.name} onChange={e => updateVariation(index, 'name', e.target.value)} />
+                    <input placeholder="R$" required style={{ ...inputStyle, padding: '10px', width: '80px' }} value={v.price} onChange={e => updateVariation(index, 'price', e.target.value)} />
+                    {variations.length > 1 && <button type="button" onClick={() => removeVariation(index)} style={{ border: 'none', background: 'none', color: '#f87171', cursor: 'pointer' }}>✕</button>}
                 </div>
-              ))}
-            </div>
-            <button type="button" onClick={addVariation} style={{ width: '100%', marginTop: '15px', padding: '10px', border: '2px dashed #e2e8f0', borderRadius: '12px', backgroundColor: 'transparent', color: '#94a3b8', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', cursor: 'pointer' }}>+ Adicionar Sabor</button>
+            ))}
+            <button type="button" onClick={addVariation} style={{ width: '100%', padding: '8px', border: 'none', background: '#f1f5f9', borderRadius: '10px', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+ ADICIONAR ITEM</button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
-                <input type="date" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
-              </div>
-              <div style={{ width: '100px' }}>
-                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>QTD TOTAL</label>
-                <input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
-              </div>
-            </div>
-            <input placeholder="Chave Pix para pagamento" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
+          <div style={{ display: 'flex', gap: '10px' }}>
+             <input type="date" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+             <input type="number" placeholder="Limite" style={{ ...inputStyle, width: '100px' }} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
           </div>
+          <input placeholder="Sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
 
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '20px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '16px', cursor: 'pointer', boxShadow: '0 10px 15px rgba(5, 150, 105, 0.2)' }}>
-            {loading ? 'PUBLICANDO...' : 'LANÇAR NO LANAI 🚀'}
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
+            {loading ? 'LANÇANDO...' : 'LANÇAR NO GRUPO 🚀'}
           </button>
-
         </form>
       </div>
     </div>
