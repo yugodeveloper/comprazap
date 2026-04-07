@@ -47,7 +47,7 @@ function LandingContent() {
     }
   };
 
-  // --- PERSISTÊNCIA LOCAL DO CARRINHO ---
+  // PERSISTÊNCIA LOCAL DO CARRINHO
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) {
@@ -183,7 +183,7 @@ function LandingContent() {
       const { data } = await supabase.from('orders').insert(orderData).select().single(); 
       savedOrder = data; 
     }
-    localStorage.removeItem(`cart_${id}`); // Limpa carrinho salvo ao concluir
+    localStorage.removeItem(`cart_${id}`);
     setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
     await enviarNotificacaoTelegram(savedOrder, itemsList);
     setStep('concluido'); setLoading(false);
@@ -234,11 +234,31 @@ function LandingContent() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        <div style={{ height: '140px', backgroundColor: '#eee', overflow: 'hidden', position: 'relative' }}>
-          {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', color: 'white' }}>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>{campaign?.title}</h1>
-          </div>
+        {/* CARROSSEL DE IMAGENS NATIVO */}
+        <div style={{ 
+          height: '240px', 
+          backgroundColor: '#eee', 
+          display: 'flex', 
+          overflowX: 'auto', 
+          scrollSnapType: 'x mandatory',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        }}>
+          {(campaign?.image_gallery?.length > 0 ? campaign.image_gallery : [campaign?.image_url]).map((img: string, i: number) => (
+            <div key={i} style={{ minWidth: '100%', height: '100%', scrollSnapAlign: 'start', position: 'relative' }}>
+              <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+              {i === 0 && campaign?.image_gallery?.length > 1 && (
+                <div style={{ position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 900 }}>DESLIZE ➔</div>
+              )}
+              <div style={{ position: 'absolute', left: 10, top: 10, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: '10px', fontSize: '9px', fontWeight: 900 }}>
+                {i + 1} / {campaign?.image_gallery?.length || 1}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '15px 20px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b' }}>{campaign?.title}</h1>
         </div>
 
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
@@ -334,11 +354,8 @@ function LandingContent() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
-              
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS SELECIONADOS</p>
-                  </div>
+                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0' }}>CONFERIR ITENS SELECIONADOS</p>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
