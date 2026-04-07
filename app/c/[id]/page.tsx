@@ -31,27 +31,18 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  const carouselRef = useRef<HTMLDivElement>(null);
+  const maskPhone = (value: string) => {
+    return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
+  };
 
-  // AUTO-SCROLL CARROSSEL
-  useEffect(() => {
-    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1) return;
-    const interval = setInterval(() => {
-      if (carouselRef.current) {
-        const { scrollLeft, clientWidth, scrollWidth } = carouselRef.current;
-        const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 10;
-        carouselRef.current.scrollTo({
-          left: isAtEnd ? 0 : scrollLeft + clientWidth,
-          behavior: 'smooth'
-        });
-      }
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [campaign]);
+  const copyPix = () => {
+    if (campaign?.pix_key) {
+      navigator.clipboard.writeText(campaign.pix_key);
+      alert("Chave Pix copiada! ✅");
+    }
+  };
 
-  const maskPhone = (v: string) => v.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
-  const copyPix = () => { if (campaign?.pix_key) { navigator.clipboard.writeText(campaign.pix_key); alert("Pix copiado! ✅"); } };
-
+  // PERSISTÊNCIA DO CARRINHO
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
@@ -62,12 +53,13 @@ function LandingContent() {
   }, [itemsList, id]);
 
   const handleLogout = () => {
-    if(!confirm("Deseja trocar de vizinho?")) return;
+    if(!confirm("Deseja alterar o usuário?")) return;
     localStorage.removeItem(`cart_${id}`);
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
+  // NOTIFICAÇÕES TELEGRAM
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -210,13 +202,29 @@ function LandingContent() {
 
   if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando...</div>
 
+  // LÓGICA DE FALLBACK DO HEADER
   const headerImage = campaign?.image_url || (campaign?.image_gallery?.length > 0 ? campaign.image_gallery[0] : null);
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
+      {/* CSS PARA O CARROSSEL ANIMADO MARQUEE */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          display: flex;
+          animation: marquee 25s linear infinite;
+        }
+        .animate-marquee:active {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       <div style={containerStyle}>
         
-        {/* HEADER */}
+        {/* 1. HEADER (CAPA COMPRIDA COM FALLBACK) */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -224,7 +232,7 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* INFO */}
+        {/* 2. DADOS RÁPIDOS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -233,40 +241,38 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL */}
+          {/* 3. CARROSSEL DINÂMICO MARQUEE (Apenas se houver galeria) */}
           {campaign?.image_gallery?.length > 0 && (
-            <div style={{ marginBottom: 25 }}>
-              <div 
-                ref={carouselRef}
-                style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', gap: 10 }}
-              >
-                {campaign.image_gallery.map((img: string, i: number) => (
-                  <div key={i} style={{ minWidth: '85%', height: '350px', scrollSnapAlign: 'center', borderRadius: '20px', overflow: 'hidden', backgroundColor: '#f1f5f9', position: 'relative', flexShrink: 0 }}>
+            <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', marginBottom: 25, borderRadius: '20px', cursor: 'grab' }}>
+              <div className="animate-marquee">
+                {/* Duplicamos a lista para criar o loop infinito visual */}
+                {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
+                  <div key={i} style={{ minWidth: '280px', height: '380px', marginRight: '12px', flexShrink: 0, borderRadius: '20px', overflow: 'hidden' }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 10px', borderRadius: '15px', fontSize: '10px', fontWeight: 900 }}>{i+1} / {campaign.image_gallery.length}</div>
                   </div>
                 ))}
               </div>
+              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>Toque e segure para pausar</p>
             </div>
           )}
 
-          {/* DESCRIÇÃO PRE-WRAP */}
+          {/* 4. DESCRIÇÃO PRE-WRAP */}
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
-            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap' }}>
+            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
               {campaign?.description}
             </p>
           </div>
 
-          {/* VENDEDOR */}
+          {/* 5. VENDEDOR */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
-              {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
+              {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
           </div>
 
-          {/* FLUXO DE COMPRA */}
+          {/* FLUXO DE COMPRA (MANTIDO ÍNTEGRO) */}
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
@@ -325,7 +331,7 @@ function LandingContent() {
               </div>
               {itemsList.length > 0 && (
                 <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20, border: '1px solid #dcfce7' }}>
-                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}> <div style={{fontSize: 13}}><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> ))}
+                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 13 }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
                   <textarea placeholder="Obs (ex: Sem canela)..." style={{width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '12px', marginTop: 10, fontFamily: 'sans-serif', outline: 'none'}} rows={2} value={observations} onChange={e => setObservations(e.target.value)} />
                   <button onClick={() => setStep('dados')} style={btnStyle}>PRÓXIMO PASSO</button>
@@ -342,7 +348,7 @@ function LandingContent() {
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
               <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: 0 }}>CONFERIR ITENS</p>
+                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0' }}>CONFERIR ITENS</p>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
                        <span>{item.qty}x {item.name}</span>
@@ -359,7 +365,7 @@ function LandingContent() {
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : '#f1f5f9', color: '#166534', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
+              <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : 'Aguardando Pagamento'}
               </div>
               <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
@@ -393,7 +399,7 @@ function LandingContent() {
 
 export default function LandingPageSuspense() {
   return (
-    <Suspense fallback={<div>Carregando...</div>}>
+    <Suspense fallback={<div style={{textAlign:'center', marginTop:100}}>Carregando...</div>}>
       <LandingContent />
     </Suspense>
   )
