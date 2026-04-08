@@ -64,20 +64,29 @@ function NovaCampanhaContent() {
     setUploading(false)
   }
 
+  const addVariation = () => setVariations([...variations, { name: '', price: '' }])
+  const removeVariation = (index: number) => setVariations(variations.filter((_, i) => i !== index))
+  
+  // FUNÇÃO CORRIGIDA (DENTRO DO COMPONENTE)
+  const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
+    const newVars = [...variations]
+    newVars[index][field] = value
+    setVariations(newVars)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
       
-      // AJUSTE: Se headerImg estiver vazio, enviamos null explicitamente para limpar no banco
       const payload = {
         title, 
         description, 
         pix_key: pixKey, 
         expires_at: expiresAt,
         max_sales: parseInt(maxSales), 
-        image_url: headerImg || null, // Se estiver vazio, vira null
+        image_url: headerImg || null, // Garante a exclusão no banco enviando null
         image_gallery: gallery, 
         creator_id: userId, 
         status: 'active'
@@ -191,12 +200,6 @@ function NovaCampanhaContent() {
       </div>
     </div>
   )
-}
-
-const updateVariation = (index: number, field: string, value: string, variations: any, setVariations: any) => {
-    const newVars = [...variations]
-    newVars[index][field] = value
-    setVariations(newVars)
 }
 
 export default function NovaCampanha() {
