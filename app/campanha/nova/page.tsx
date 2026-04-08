@@ -22,7 +22,6 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
-  // ESTADO DE DEBUG: Para ver o que o banco está cuspindo
   const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
@@ -39,7 +38,7 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
-          setDebugData(camp.products); // Debug visual aqui
+          setDebugData(camp.products); 
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -51,22 +50,26 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          if (camp.products && Array.isArray(camp.products) && camp.products.length > 0) {
-            const prod = camp.products[0];
-            let rawVars = prod.variations;
+          // --- CORREÇÃO BASEADA NO DEBUG: Trata products como objeto ou array ---
+          const prodData = camp.products;
+          if (prodData) {
+            // Pega o objeto de produto (seja ele o item direto ou o primeiro do array)
+            const prod = Array.isArray(prodData) ? prodData[0] : prodData;
             
-            let finalArray = [];
-            if (typeof rawVars === 'string') {
-              try { finalArray = JSON.parse(rawVars); } catch(e) { finalArray = []; }
-            } else if (Array.isArray(rawVars)) {
-              finalArray = rawVars;
-            }
+            if (prod && prod.variations) {
+              let loadedVars = [];
+              if (typeof prod.variations === 'string') {
+                try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
+              } else {
+                loadedVars = prod.variations;
+              }
 
-            if (finalArray.length > 0) {
-              setVariations(finalArray.map((v: any) => ({
-                name: String(v.name || ''),
-                price: String(v.price || '')
-              })));
+              if (Array.isArray(loadedVars) && loadedVars.length > 0) {
+                setVariations(loadedVars.map((v: any) => ({
+                  name: String(v.name || ''),
+                  price: String(v.price || '')
+                })));
+              }
             }
           }
         }
@@ -133,6 +136,7 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
+      // Usamos UPSERT para evitar erros de chave duplicada na edição
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({
@@ -157,7 +161,6 @@ function NovaCampanhaContent() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
         
-        {/* BLOCO DE DEBUG VISUAL - APENAS PARA TESTE */}
         {editId && (
           <div style={{ fontSize: '10px', background: '#333', color: '#0f0', padding: '10px', borderRadius: '10px', overflowX: 'auto' }}>
             <strong>DEBUG - DADOS DOS PRODUTOS NO BANCO:</strong>
