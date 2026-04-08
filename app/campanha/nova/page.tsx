@@ -47,16 +47,20 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // CORREÇÃO ITEM 10: MAPEAMENTO DAS VARIAÇÕES JSONB
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
-            if (Array.isArray(prod.variations) && prod.variations.length > 0) {
-              setVariations(prod.variations.map((v: any) => ({ 
-                name: v.name, 
-                price: v.price.toString() 
-              })));
-            } else if (prod.name && prod.price) {
-              setVariations([{ name: prod.name, price: prod.price.toString() }]);
+            // BLINDAGEM: Garante que variações sejam lidas corretamente como array
+            let loadedVars = [];
+            if (Array.isArray(prod.variations)) {
+              loadedVars = prod.variations;
+            } else if (typeof prod.variations === 'string') {
+              try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
+            }
+            
+            if (loadedVars.length > 0) {
+              setVariations(loadedVars.map((v: any) => ({ name: v.name, price: v.price.toString() })));
+            } else if (prod.name) {
+              setVariations([{ name: prod.name, price: prod.price?.toString() || '' }]);
             }
           }
         }
@@ -120,18 +124,25 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
+      // REFORÇO NO SALVAMENTO
       await supabase.from('products').delete().eq('campaign_id', campId);
-      await supabase.from('products').insert({
+      const { error: prodErr } = await supabase.from('products').insert({
         campaign_id: campId,
         name: title,
         price: formattedVariations[0]?.price || 0,
         variations: formattedVariations
       });
 
+      if (prodErr) throw prodErr;
+
       alert("Campanha salva com sucesso! 🚀");
       router.push('/');
-    } catch (err: any) { alert("Erro ao salvar: " + err.message); } 
-    finally { setLoading(false); }
+      setTimeout(() => window.location.reload(), 500); // Garante limpeza de cache
+    } catch (err: any) { 
+      alert("Erro ao salvar: " + err.message); 
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #e2e8f0', fontSize: '14px', boxSizing: 'border-box' };
@@ -150,7 +161,7 @@ function NovaCampanhaContent() {
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
               <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
                 {headerImg ? (
-                  <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
+                  <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} /><span style={{ fontSize: '10px', color: '#94a3b8' }}>+ Capa</span>
@@ -162,7 +173,7 @@ function NovaCampanhaContent() {
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Foto WhatsApp</label>
               <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
                 {shareImg ? (
-                  <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
+                  <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} /><span style={{ fontSize: '18px' }}>📸</span><span style={{ fontSize: '8px', color: '#059669', fontWeight: 'bold' }}>POLAROID</span>
@@ -205,14 +216,30 @@ function NovaCampanhaContent() {
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-             <div style={{ flex: 1 }}><input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} /></div>
-             <div style={{ width: 100 }}><input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} /></div>
+             <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
+                <div style={{ position: 'relative' }}>
+                  <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
+                  <input 
+                    type="date" 
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
+                    onChange={e => {
+                      const date = new Date(e.target.value + 'T00:00:00');
+                      setExpiresAt(date.toLocaleDateString('pt-BR'));
+                    }}
+                  />
+                </div>
+             </div>
+             <div style={{ width: 100 }}><label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>LIMITE</label><input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} /></div>
           </div>
           <input placeholder="Sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
 
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
-            {loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" onClick={() => router.push('/')} style={{ flex: 1, padding: '18px', backgroundColor: '#f1f5f9', color: '#64748b', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>CANCELAR</button>
+            <button type="submit" disabled={loading} style={{ flex: 2, padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
+              {loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

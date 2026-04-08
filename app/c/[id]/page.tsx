@@ -61,26 +61,17 @@ function LandingContent() {
   const handleScroll = () => {
     if (scrollRef.current && gallery.length > 1) {
       const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
-      if (scrollLeft <= 0) {
-        scrollRef.current.scrollTo({ left: scrollWidth - (2 * clientWidth) });
-      } 
-      else if (scrollLeft >= scrollWidth - clientWidth) {
-        scrollRef.current.scrollTo({ left: clientWidth });
-      }
+      if (scrollLeft <= 0) { scrollRef.current.scrollTo({ left: scrollWidth - (2 * clientWidth) }); } 
+      else if (scrollLeft >= scrollWidth - clientWidth) { scrollRef.current.scrollTo({ left: clientWidth }); }
       const index = Math.round(scrollLeft / clientWidth) - 1;
-      if (index >= 0 && index < gallery.length) {
-        setActiveIndex(index);
-      }
+      if (index >= 0 && index < gallery.length) { setActiveIndex(index); }
     }
   };
 
   useEffect(() => {
     if (gallery.length <= 1 || isPaused) return;
     const interval = setInterval(() => {
-      if (scrollRef.current) {
-        const { clientWidth } = scrollRef.current;
-        scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
-      }
+      if (scrollRef.current) { scrollRef.current.scrollBy({ left: scrollRef.current.clientWidth, behavior: 'smooth' }); }
     }, 5000);
     return () => clearInterval(interval);
   }, [gallery, isPaused]);
@@ -89,8 +80,7 @@ function LandingContent() {
     if (scrollRef.current) {
       const width = scrollRef.current.clientWidth;
       scrollRef.current.scrollBy({ left: direction === 'right' ? width : -width, behavior: 'smooth' });
-      setIsPaused(true);
-      setTimeout(() => setIsPaused(false), 8000);
+      setIsPaused(true); setTimeout(() => setIsPaused(false), 8000);
     }
   };
 
@@ -104,7 +94,7 @@ function LandingContent() {
   }, [itemsList, id]);
 
   const handleLogout = () => {
-    if(!confirm("Deseja alterar o usuário?")) return;
+    if(!confirm("Deseja alterar o usuário ou fazer novo pedido?")) return;
     localStorage.removeItem(`cart_${id}`);
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
@@ -116,9 +106,8 @@ function LandingContent() {
     if (!token || !chatId) return;
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
-    // ADICIONADO: Observações na mensagem
-    const obsPart = order.observations ? `\n📝 *Obs:* ${order.observations}` : '';
-    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsPart}`;
+    const obsText = order.observations ? `\n📝 *Obs:* ${order.observations}` : '';
+    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsText}`;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -132,21 +121,16 @@ function LandingContent() {
     setLoading(true);
     try {
       const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
-      const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false }).limit(1).maybeSingle();
-
       if (orders && orders.length > 0) {
         const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
         setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
         if (pending) {
           setExistingOrder(pending); setOrderStatus(pending.status); setObservations(pending.observations || '');
           setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
-          if (Array.isArray(pending.selected_variations)) {
-            setItemsList(pending.selected_variations); setStep('concluido');
-            setLoading(false); return;
-          }
+          setItemsList(pending.selected_variations); setStep('concluido');
+          setLoading(false); return;
         }
       }
-      if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
       setStep('itens');
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -194,7 +178,6 @@ function LandingContent() {
     setLoading(true);
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations: observations };
     const { data: savedOrder } = await supabase.from('orders').upsert(existingOrder?.id ? { id: existingOrder.id, ...orderData } : orderData).select().single();
-    localStorage.removeItem(`cart_${id}`);
     setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
     await enviarNotificacaoTelegram(savedOrder, itemsList);
     setStep('concluido'); setLoading(false);
@@ -208,9 +191,8 @@ function LandingContent() {
     setLoading(false);
   };
 
-  // ADICIONADO: Função para remover comprovante
   const handleRemoveReceipt = async () => {
-    if(!confirm("Remover este comprovante e enviar outro?")) return;
+    if(!confirm("Remover este comprovante?")) return;
     setUploading(true);
     await supabase.from('orders').update({ receipt_url: null }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: null }));
@@ -268,12 +250,7 @@ function LandingContent() {
           {gallery.length > 0 && (
             <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
-                ref={scrollRef}
-                onScroll={handleScroll}
-                onTouchStart={() => setIsPaused(true)}
-                onTouchEnd={() => setIsPaused(false)}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
+                ref={scrollRef} onScroll={handleScroll}
                 style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', borderRadius: '25px', gap: 0 }}
               >
                 {loopItems.map((img: string, i: number) => (
@@ -293,9 +270,7 @@ function LandingContent() {
           )}
 
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
-            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-              {campaign?.description}
-            </p>
+            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{campaign?.description}</p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
@@ -372,7 +347,6 @@ function LandingContent() {
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '❌ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
 
-              {/* ITEM 8: QR CODE E COPIAR PIX SÓ SE NÃO ESTIVER PAGO */}
               {orderStatus !== 'paid' && (
                 <>
                   <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
@@ -395,22 +369,12 @@ function LandingContent() {
                   </div>
               </div>
 
-              {/* ITEM 9: DESIGN DO COMPROVANTE MELHORADO */}
               <div style={{ marginTop: 20, padding: 15, backgroundColor: '#f8fafc', borderRadius: 20, border: '2px dashed #e2e8f0' }}>
                 <p style={{ fontSize: 11, fontWeight: 900, color: '#64748b', marginBottom: 10 }}>COMPROVANTE PIX</p>
-                
                 {existingOrder?.receipt_url ? (
                   <div style={{ position: 'relative', width: '100px', margin: '0 auto' }}>
-                    <img 
-                      src={existingOrder.receipt_url} 
-                      style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: 10, cursor: 'pointer', border: '2px solid #059669' }} 
-                      onClick={() => window.open(existingOrder.receipt_url, '_blank')}
-                    />
-                    <button 
-                      onClick={handleRemoveReceipt}
-                      style={{ position: 'absolute', top: -10, right: -10, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold' }}
-                    >✕</button>
-                    <p style={{ fontSize: 9, color: '#059669', fontWeight: 900, marginTop: 5 }}>ENVIADO!</p>
+                    <img src={existingOrder.receipt_url} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: 10, cursor: 'pointer', border: '2px solid #059669' }} onClick={() => window.open(existingOrder.receipt_url, '_blank')} />
+                    <button onClick={handleRemoveReceipt} style={{ position: 'absolute', top: -10, right: -10, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                   </div>
                 ) : (
                   <label style={{ display: 'block', padding: '15px', backgroundColor: 'white', borderRadius: 15, border: '1px solid #cbd5e1', cursor: 'pointer' }}>
@@ -420,7 +384,6 @@ function LandingContent() {
                 )}
               </div>
 
-              {/* ITEM 4: BOTÃO PARA REINICIAR / NOVO PEDIDO APÓS PAGO */}
               {orderStatus === 'paid' && (
                 <button onClick={handleLogout} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
               )}
@@ -436,9 +399,5 @@ function LandingContent() {
 }
 
 export default function LandingPageSuspense() {
-  return (
-    <Suspense fallback={<div style={{textAlign:'center', marginTop:100}}>Carregando...</div>}>
-      <LandingContent />
-    </Suspense>
-  )
+  return ( <Suspense fallback={<div style={{textAlign:'center', marginTop:100}}>Carregando...</div>}><LandingContent /></Suspense> )
 }
