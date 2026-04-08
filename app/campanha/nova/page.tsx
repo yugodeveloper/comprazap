@@ -58,6 +58,8 @@ function NovaCampanhaContent() {
             
             if (loadedVars.length > 0) {
               setVariations(loadedVars.map((v: any) => ({ name: v.name, price: v.price.toString() })));
+            } else if (prod.name) {
+              setVariations([{ name: prod.name, price: prod.price?.toString() || '' }]);
             }
           }
         }
@@ -87,8 +89,7 @@ function NovaCampanhaContent() {
   const addVariation = () => setVariations([...variations, { name: '', price: '' }])
   const removeVariation = (index: number) => {
     if (variations.length === 1) return alert("Mínimo de 1 item");
-    const newVars = variations.filter((_, i) => i !== index);
-    setVariations(newVars);
+    setVariations(variations.filter((_, i) => i !== index));
   }
   const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
     const newVars = [...variations];
@@ -101,8 +102,6 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não identificado. Faça login novamente.");
-
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -113,15 +112,10 @@ function NovaCampanhaContent() {
       };
 
       let campId = editId;
-
       if (editId) {
-        const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
-        if (campErr) throw campErr;
+        await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
-        // CORREÇÃO: Adicionado .select().single() para garantir que o 'id' retorne
-        const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
-        if (campErr) throw campErr;
-        if (!camp) throw new Error("Erro ao criar campanha no banco.");
+        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
         campId = camp.id;
       }
 
@@ -132,7 +126,7 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      // LÓGICA DE SALVAMENTO DE PRODUTOS
+      // LÓGICA DE SALVAMENTO LIMPA
       await supabase.from('products').delete().eq('campaign_id', campId);
       const { error: prodErr } = await supabase.from('products').insert({
         campaign_id: campId,
@@ -145,7 +139,6 @@ function NovaCampanhaContent() {
       router.push('/');
       setTimeout(() => window.location.reload(), 300);
     } catch (err: any) { 
-      console.error("Erro completo:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -172,6 +165,23 @@ function NovaCampanhaContent() {
               <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} />
               {shareImg ? <img src={shareImg} style={{width:'100%', height:'100%', objectFit:'contain'}} alt="" /> : <div style={{textAlign:'center', fontSize:10, marginTop:40}}>+ CARD</div>}
             </label>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria (Até 5)</label>
+            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
+                {gallery.map((img, i) => (
+                  <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
+                  </div>
+                ))}
+                {gallery.length < 5 && (
+                  <label style={{ width: '80px', height: '110px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor: 'white' }}>
+                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, 'gallery')} /><span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
+                  </label>
+                )}
+            </div>
           </div>
 
           <input placeholder="Título da Campanha" required style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
