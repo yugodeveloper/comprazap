@@ -3,14 +3,8 @@ import { Metadata } from 'next'
 import { Suspense } from 'react'
 import LandingContent from './LandingContent'
 
-type Props = {
-  params: { id: string }
-}
-
-// 1. GERADOR DE METADADOS (O QUE O WHATSAPP LÊ)
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const { data: cp } = await supabase.from('campaigns').select('*').eq('id', params.id).single();
-
   if (!cp) return { title: 'CompraZap⚡' };
 
   return {
@@ -19,25 +13,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: cp.title,
       description: cp.description?.substring(0, 160),
-      images: [cp.share_image || cp.image_url || ''],
+      images: [{ url: cp.share_image || cp.image_url || '', width: 800, height: 1000 }],
       type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: cp.title,
-      description: cp.description?.substring(0, 160),
-      images: [cp.share_image || cp.image_url || ''],
     }
   }
 }
 
-// 2. COMPONENTE PRINCIPAL (SERVER SIDE)
-export default async function LandingPage({ params }: Props) {
-  // Busca os dados da campanha no servidor para passar para o cliente
+export default async function LandingPage({ params }: { params: { id: string } }) {
   const { data: cp } = await supabase.from('campaigns').select('*').eq('id', params.id).single();
-  
   return (
-    <Suspense fallback={<div style={{textAlign:'center', marginTop:100, color: '#059669', fontWeight: 'bold'}}>Carregando Oferta...</div>}>
+    <Suspense fallback={<div style={{textAlign:'center', marginTop:100}}>Carregando...</div>}>
       <LandingContent initialCampaign={cp} id={params.id} />
     </Suspense>
   );
