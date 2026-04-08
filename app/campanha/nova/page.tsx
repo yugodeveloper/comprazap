@@ -22,8 +22,8 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
+  // ESTADOS DE CONTROLE
   const [existingProductId, setExistingProductId] = useState<string | null>(null)
-  const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
@@ -39,7 +39,6 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
-          setDebugData(camp.products); 
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -51,20 +50,16 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          const prodData = camp.products;
-          if (prodData) {
-            const prod = Array.isArray(prodData) ? prodData[0] : prodData;
-            
+          if (camp.products) {
+            const prod = Array.isArray(camp.products) ? camp.products[0] : camp.products;
             if (prod) {
-              setExistingProductId(prod.id);
-              
+              setExistingProductId(prod.id); // Captura o ID real da linha de produtos
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
                 try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
               } else {
                 loadedVars = prod.variations;
               }
-
               if (Array.isArray(loadedVars) && loadedVars.length > 0) {
                 setVariations(loadedVars.map((v: any) => ({
                   name: String(v.name || ''),
@@ -113,7 +108,7 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não identificado.");
+      if (!userId) throw new Error("Sessão expirada.");
 
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
@@ -126,11 +121,10 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
-        if (campErr) throw campErr;
+        await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
-        const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
-        if (campErr || !camp) throw new Error("Erro ao criar campanha.");
+        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
+        if (!camp) throw new Error("Erro ao criar campanha.");
         campId = camp.id;
       }
 
@@ -141,23 +135,25 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // CORREÇÃO FINAL: UPSERT UTILIZANDO O CAMPO DE CONFLITO 'campaign_id'
+      // --- UPSERT COM ID PRIMÁRIO (CURA O ERRO DE RLS) ---
+      const productPayload: any = {
+        campaign_id: campId,
+        variations: formattedVariations
+      };
+
+      if (existingProductId) {
+        productPayload.id = existingProductId; // Se for edição, manda o ID da linha
+      }
+
       const { error: prodErr } = await supabase
         .from('products')
-        .upsert(
-          {
-            campaign_id: campId,
-            variations: formattedVariations
-          }, 
-          { onConflict: 'campaign_id' }
-        );
+        .upsert(productPayload, { onConflict: 'campaign_id' });
 
       if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
-      console.error("Erro detalhado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -169,13 +165,13 @@ function NovaCampanhaContent() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-        
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Blocos de imagem... */}
           <div style={{ display: 'flex', gap: '15px' }}>
             <label style={{ flex: 1.5, height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', cursor:'pointer' }}>
               <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} />
@@ -187,6 +183,7 @@ function NovaCampanhaContent() {
             </label>
           </div>
 
+          {/* Galeria... */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria (Até 5)</label>
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
