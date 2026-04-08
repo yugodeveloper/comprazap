@@ -118,7 +118,6 @@ function LandingContent() {
     setStep('itens'); 
   };
 
-  // RESTAURADO: Telegram com sendPhoto e botões Inline
   const enviarNotificacaoTelegram = async (order: any, itens: any[], receiptUrl?: string) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -207,7 +206,7 @@ function LandingContent() {
       const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single();
       if (!cp) return;
       setCampaign(cp);
-      const { data: pd = await supabase.from('products').select('*').eq('campaign_id', id).single();
+      const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
       
       let finalVariations = [];
       if (pd) {
@@ -263,7 +262,6 @@ function LandingContent() {
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
     setOrderStatus('pending');
     
-    // ITEM 4: Notifica Telegram com a Foto e Botões
     await enviarNotificacaoTelegram(existingOrder, itemsList, publicUrl);
     
     alert("Comprovante enviado! ✅");
@@ -316,7 +314,7 @@ function LandingContent() {
               >
                 {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ minWidth: '100%', width: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   </div>
                 ))}
               </div>
@@ -420,7 +418,6 @@ function LandingContent() {
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
-              {/* ITEM 5: Status dinâmico corrigido */}
               <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : 
                  orderStatus === 'rejected' ? '❌ Comprovante Recusado' : 
