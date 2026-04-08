@@ -21,7 +21,6 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
-  // CARREGAR DADOS SE FOR EDIÇÃO
   useEffect(() => {
     if (editId) {
       const loadEditData = async () => {
@@ -88,17 +87,21 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não logado.");
+      if (!userId) throw new Error("Usuário não identificado.");
 
-      // Forçamos valores nulos se estiverem vazios para limpar no banco
+      // LÓGICA DE LIMPEZA EXPLÍCITA:
+      // Se a string estiver vazia, enviamos null. Se não, enviamos a URL.
+      const dbImageUrl = headerImg && headerImg.trim() !== '' ? headerImg : null;
+      const dbGallery = gallery && gallery.length > 0 ? gallery : [];
+
       const payload = {
         title: title,
         description: description,
         pix_key: pixKey,
         expires_at: expiresAt,
         max_sales: parseInt(maxSales),
-        image_url: headerImg && headerImg.trim() !== '' ? headerImg : null,
-        image_gallery: gallery && gallery.length > 0 ? gallery : [], // Se vazio, envia array vazio
+        image_url: dbImageUrl, // Aqui vai null se tiver apagado no UI
+        image_gallery: dbGallery,
         creator_id: userId,
         status: 'active'
       };
@@ -106,6 +109,7 @@ function NovaCampanhaContent() {
       let campId = editId;
 
       if (editId) {
+        // Na edição, usamos update
         const { error: updErr } = await supabase
           .from('campaigns')
           .update(payload)
@@ -113,6 +117,7 @@ function NovaCampanhaContent() {
         
         if (updErr) throw updErr;
       } else {
+        // Na criação, usamos insert
         const { data: camp, error: insErr } = await supabase
           .from('campaigns')
           .insert(payload)
@@ -128,7 +133,7 @@ function NovaCampanhaContent() {
         price: parseFloat(v.price.replace(',', '.'))
       }))
 
-      // Sincroniza o Produto
+      // Atualizar/Criar Produto vinculado
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({ 
@@ -138,14 +143,14 @@ function NovaCampanhaContent() {
           variations: formattedVariations 
         }, { onConflict: 'campaign_id' });
 
-      if (prodErr) console.error("Erro ao atualizar produto:", prodErr);
+      if (prodErr) console.error("Erro Produto:", prodErr);
 
-      alert("Campanha salva com sucesso! 🚀");
-      router.push('/');
-      router.refresh();
+      alert("Campanha guardada com sucesso! 🚀");
+      
+      // Forçar refresh total para garantir que o cache não mostre a imagem antiga
+      window.location.href = '/'; 
     } catch (err: any) { 
-      alert("Erro ao salvar: " + err.message); 
-      console.error(err);
+      alert("Erro ao guardar: " + err.message); 
     } finally { 
       setLoading(false); 
     }
@@ -172,7 +177,7 @@ function NovaCampanhaContent() {
             ) : (
               <label style={{ width: '100%', height: '100px', borderRadius: '15px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: 'white' }}>
                 <input type="file" accept="image/*" hidden onChange={(e) => handleUpload(e, true)} disabled={uploading} />
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>{uploading ? 'Processando...' : '+ Adicionar Capa'}</span>
+                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>{uploading ? 'A carregar...' : '+ Adicionar Capa'}</span>
               </label>
             )}
           </div>
@@ -220,10 +225,10 @@ function NovaCampanhaContent() {
                 <input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
              </div>
           </div>
-          <input placeholder="Sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
+          <input placeholder="A sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
 
           <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
-            {loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}
+            {loading ? 'A GUARDAR...' : 'GUARDAR CAMPANHA 🚀'}
           </button>
         </form>
       </div>
@@ -233,7 +238,7 @@ function NovaCampanhaContent() {
 
 export default function NovaCampanha() {
   return (
-    <Suspense fallback={<div>Carregando...</div>}>
+    <Suspense fallback={<div>A carregar...</div>}>
       <NovaCampanhaContent />
     </Suspense>
   )
