@@ -44,6 +44,7 @@ function LandingContent() {
     }
   };
 
+  // PERSISTÊNCIA DO CARRINHO
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
@@ -60,6 +61,7 @@ function LandingContent() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
+  // NOTIFICAÇÕES TELEGRAM
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -206,7 +208,6 @@ function LandingContent() {
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
-      {/* CSS PARA O MARQUEE QUE PERMITE INTERAÇÃO */}
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
@@ -260,11 +261,10 @@ function LandingContent() {
                   WebkitOverflowScrolling: 'touch'
                 }}
               >
-                <div className={`marquee-container ${!isPaused ? 'marquee-active' : ''}`}>
-                  {/* Duplicamos os itens para o loop infinito visual */}
+                <div className={`marquee-container ${!isPaused ? 'marquee-active' : ''}`} style={{ pointerEvents: isPaused ? 'auto' : 'none' }}>
                   {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
-                    <div key={i} style={{ minWidth: '280px', height: '380px', marginRight: '12px', borderRadius: '20px', overflow: 'hidden', flexShrink: 0, scrollSnapAlign: 'center' }}>
-                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div key={i} style={{ minWidth: '280px', height: '380px', marginRight: '12px', borderRadius: '20px', overflow: 'hidden', flexShrink: 0, scrollSnapAlign: 'center', backgroundColor: '#fff' }}>
+                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </div>
                   ))}
                 </div>
@@ -316,7 +316,7 @@ function LandingContent() {
                         {pastOrders.map((order: any) => (
                           <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
                               <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
                             </div>
                           </div>
