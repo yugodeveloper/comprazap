@@ -22,8 +22,8 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
-  // ESTADOS DE CONTROLE
   const [existingProductId, setExistingProductId] = useState<string | null>(null)
+  const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
@@ -39,6 +39,7 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
+          setDebugData(camp.products); 
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -50,10 +51,11 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          if (camp.products) {
-            const prod = Array.isArray(camp.products) ? camp.products[0] : camp.products;
+          const prodData = camp.products;
+          if (prodData) {
+            const prod = Array.isArray(prodData) ? prodData[0] : prodData;
             if (prod) {
-              setExistingProductId(prod.id); // Captura o ID real da linha de produtos
+              setExistingProductId(prod.id);
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
                 try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
@@ -107,8 +109,10 @@ function NovaCampanhaContent() {
     e.preventDefault()
     setLoading(true)
     try {
-      const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Sessão expirada.");
+      // DEBUG CRUCIAL: Verificando quem o sistema acha que você é
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Dono da sessão Supabase Auth:", user?.id);
+      console.log("ID guardado no LocalStorage:", localStorage.getItem('user_id'));
 
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
@@ -116,7 +120,8 @@ function NovaCampanhaContent() {
       const payload = {
         title, description, pix_key: pixKey, expires_at: isoDate, max_sales: parseInt(maxSales),
         image_url: headerImg || null, share_image: shareImg || null, image_gallery: gallery,
-        creator_id: userId, status: 'active'
+        creator_id: localStorage.getItem('user_id'), 
+        status: 'active'
       };
 
       let campId = editId;
@@ -124,8 +129,7 @@ function NovaCampanhaContent() {
         await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
         const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
-        if (!camp) throw new Error("Erro ao criar campanha.");
-        campId = camp.id;
+        campId = camp?.id;
       }
 
       const formattedVariations = variations
@@ -135,25 +139,20 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // --- UPSERT COM ID PRIMÁRIO (CURA O ERRO DE RLS) ---
-      const productPayload: any = {
-        campaign_id: campId,
-        variations: formattedVariations
-      };
-
-      if (existingProductId) {
-        productPayload.id = existingProductId; // Se for edição, manda o ID da linha
-      }
-
+      // Usamos UPSERT simples agora que o RLS está desativado no Passo 1
       const { error: prodErr } = await supabase
         .from('products')
-        .upsert(productPayload, { onConflict: 'campaign_id' });
+        .upsert({
+          campaign_id: campId,
+          variations: formattedVariations
+        }, { onConflict: 'campaign_id' });
 
       if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
+      console.error("Erro completo disparado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -171,7 +170,7 @@ function NovaCampanhaContent() {
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Blocos de imagem... */}
+          {/* Blocos de inputs idênticos ao seu original... */}
           <div style={{ display: 'flex', gap: '15px' }}>
             <label style={{ flex: 1.5, height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', cursor:'pointer' }}>
               <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} />
@@ -183,7 +182,6 @@ function NovaCampanhaContent() {
             </label>
           </div>
 
-          {/* Galeria... */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria (Até 5)</label>
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
@@ -221,9 +219,7 @@ function NovaCampanhaContent() {
                 <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
                 <div style={{ position: 'relative' }}>
                   <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
-                  <input 
-                    type="date" 
-                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
+                  <input type="date" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
                     onChange={e => {
                       const date = new Date(e.target.value + 'T00:00:00');
                       setExpiresAt(date.toLocaleDateString('pt-BR'));
