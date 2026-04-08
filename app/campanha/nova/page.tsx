@@ -49,6 +49,7 @@ function NovaCampanhaContent() {
           
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
+            // BLINDAGEM: Garante que variações sejam lidas corretamente como array
             let loadedVars = [];
             if (Array.isArray(prod.variations)) {
               loadedVars = prod.variations;
@@ -102,6 +103,8 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
+      if (!userId) throw new Error("Usuário não identificado. Faça login novamente.");
+
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -113,9 +116,13 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        await supabase.from('campaigns').update(payload).eq('id', editId);
+        const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
+        if (campErr) throw campErr;
       } else {
-        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
+        // CORREÇÃO: .select().single() adicionado para o ID não vir nulo
+        const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
+        if (campErr) throw campErr;
+        if (!camp) throw new Error("Erro ao criar campanha no banco.");
         campId = camp.id;
       }
 
@@ -126,7 +133,7 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      // LÓGICA DE SALVAMENTO LIMPA
+      // LÓGICA DE SALVAMENTO DE PRODUTOS
       await supabase.from('products').delete().eq('campaign_id', campId);
       const { error: prodErr } = await supabase.from('products').insert({
         campaign_id: campId,
@@ -139,6 +146,7 @@ function NovaCampanhaContent() {
       router.push('/');
       setTimeout(() => window.location.reload(), 300);
     } catch (err: any) { 
+      console.error("Erro detalhado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -172,7 +180,7 @@ function NovaCampanhaContent() {
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
