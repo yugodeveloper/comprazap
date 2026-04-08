@@ -91,7 +91,6 @@ function LandingContent() {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
     
-    // Recupera telefone da sessão
     const sessionPhone = localStorage.getItem('comprazap_session_phone');
     if (sessionPhone && !contact && !autoPhone) {
       const masked = maskPhone(sessionPhone);
@@ -217,14 +216,25 @@ function LandingContent() {
   };
 
   const handleCancelarCompra = async () => {
-    if (!existingOrder || !confirm("Cancelar este pedido?")) return;
+    if (!existingOrder) return;
+    
+    // Alerta inteligente caso já exista comprovante
+    const hasReceipt = !!existingOrder.receipt_url;
+    const msg = hasReceipt 
+      ? "⚠️ Você já enviou um comprovante! Se cancelar agora, o vendedor precisará estornar ou validar manualmente no WhatsApp. Deseja cancelar mesmo assim?"
+      : "Deseja cancelar este pedido?";
+
+    if (!confirm(msg)) return;
+
     setLoading(true);
+    // Atualiza status mas mantém o receipt_url para auditoria do vendedor
     await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
     setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens');
     setLoading(false);
   };
 
   const handleRemoveReceipt = async () => {
+    if (orderStatus === 'paid') return; // Bloqueio total se aprovado
     if(!confirm("Remover este comprovante e enviar outro?")) return;
     setUploading(true);
     await supabase.from('orders').update({ receipt_url: null }).eq('id', existingOrder.id);
@@ -246,6 +256,13 @@ function LandingContent() {
     setUploading(false);
   };
 
+  const InfoBadge = ({label, value}: {label: string, value: string}) => (
+    <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
+      <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</p>
+      <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{value}</p>
+    </div>
+  );
+
   const containerStyle: React.CSSProperties = { maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px rgba(0,0,0,0.1)', fontFamily: 'sans-serif' };
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', fontSize: '16px' };
@@ -259,25 +276,16 @@ function LandingContent() {
       <div style={containerStyle}>
         
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
-          {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
+          {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>{campaign?.title}</h1>
           </div>
         </div>
 
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
-            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Local</p>
-            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>Cond. Lanai</p>
-          </div>
-          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
-            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Expira</p>
-            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'}</p>
-          </div>
-          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px' }}>
-            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Vizinhos</p>
-            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{totalBuyers} já pediram</p>
-          </div>
+          <InfoBadge label="Local" value="Cond. Lanai" />
+          <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
+          <InfoBadge label="Vizinhos" value={`${totalBuyers} já pediram`} />
         </div>
 
         <div style={{ padding: '15px 20px' }}>
@@ -286,6 +294,10 @@ function LandingContent() {
             <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
                 ref={scrollRef} onScroll={handleScroll}
+                onTouchStart={() => setIsPaused(true)}
+                onTouchEnd={() => setIsPaused(false)}
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
                 style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', borderRadius: '25px', gap: 0 }}
               >
                 {loopItems.map((img: string, i: number) => (
@@ -322,7 +334,6 @@ function LandingContent() {
             </div>
           )}
 
-          {/* RECUPERADO: Badge Verde de Identificação com Histórico */}
           {step !== 'identificacao' && (
             <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -426,19 +437,28 @@ function LandingContent() {
                 {existingOrder?.receipt_url ? (
                   <div style={{ position: 'relative', width: '100px', margin: '0 auto' }}>
                     <img src={existingOrder.receipt_url} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: 10, cursor: 'pointer', border: '2px solid #059669' }} onClick={() => window.open(existingOrder.receipt_url, '_blank')} />
-                    <button onClick={handleRemoveReceipt} style={{ position: 'absolute', top: -10, right: -10, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                    {/* SÓ MOSTRA O X SE NÃO ESTIVER PAGO */}
+                    {orderStatus !== 'paid' && (
+                      <button onClick={handleRemoveReceipt} style={{ position: 'absolute', top: -10, right: -10, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                    )}
                   </div>
                 ) : (
-                  <label style={{ display: 'block', padding: '15px', backgroundColor: 'white', borderRadius: 15, border: '1px solid #cbd5e1', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 12, fontWeight: 900, color: '#059669' }}>{uploading ? 'ENVIANDO...' : '➕ CLIQUE PARA ENVIAR'}</span>
-                    <input type="file" accept="image/*" hidden onChange={handleUploadComprovante} disabled={uploading} />
-                  </label>
+                  // SÓ MOSTRA O INPUT DE ARQUIVO SE NÃO ESTIVER PAGO
+                  orderStatus !== 'paid' && (
+                    <label style={{ display: 'block', padding: '15px', backgroundColor: 'white', borderRadius: 15, border: '1px solid #cbd5e1', cursor: 'pointer' }}>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: '#059669' }}>{uploading ? 'ENVIANDO...' : '➕ CLIQUE PARA ENVIAR'}</span>
+                      <input type="file" accept="image/*" hidden onChange={handleUploadComprovante} disabled={uploading} />
+                    </label>
+                  )
                 )}
               </div>
 
-              <button onClick={handleNovoPedido} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
-
-              {!existingOrder?.receipt_url && orderStatus !== 'paid' && <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', marginTop: 20, cursor: 'pointer', fontSize: 12 }}>CANCELAR PEDIDO</button>}
+              {/* BOTÃO DINÂMICO: NOVO PEDIDO SE PAGO, SENÃO CANCELAR */}
+              {orderStatus === 'paid' ? (
+                <button onClick={handleNovoPedido} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
+              ) : (
+                <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', marginTop: 30, cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>CANCELAR ESTE PEDIDO</button>
+              )}
             </div>
           )}
         </div>
