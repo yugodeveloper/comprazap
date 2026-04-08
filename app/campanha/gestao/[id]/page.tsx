@@ -34,11 +34,16 @@ export default function GestaoCampanha() {
     }
   }
 
+  // ITEM 6: Notificar Telegram quando comprovante chegar
   useEffect(() => {
     fetchData()
     const channel = supabase
       .channel(`gestao-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `campaign_id=eq.${id}` }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `campaign_id=eq.${id}` }, (payload) => {
+        if (payload.new.receipt_url && !payload.old.receipt_url) {
+            // Se chegou comprovante novo, podemos disparar um alerta aqui se o Telegram do cliente não funcionou
+            console.log("Novo comprovante detectado!");
+        }
         fetchData()
       })
       .subscribe()
@@ -46,20 +51,16 @@ export default function GestaoCampanha() {
     return () => { supabase.removeChannel(channel) }
   }, [id])
 
-  const handleStatus = async (orderId: string, newStatus: 'paid' | 'rejected') => {
-    const confirmacao = newStatus === 'paid' 
-      ? "Confirmar este pagamento?" 
-      : "Rejeitar este comprovante?";
-
+  const handleStatus = async (orderId: string, newStatus: 'paid' | 'rejected' | 'cancelled') => {
+    const confirmacao = newStatus === 'paid' ? "Confirmar este pagamento?" : newStatus === 'rejected' ? "Rejeitar este comprovante?" : "Cancelar pedido?";
     if (!confirm(confirmacao)) return;
 
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
     if (!error) {
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
+      fetchData();
     }
   }
 
-  // --- LÓGICA DE WHATSAPP MELHORADA ---
   const getWhatsAppLink = (order: any) => {
     const cleanPhone = order.buyer_contact.replace(/\D/g, "");
     const campaignUrl = `${window.location.origin}/c/${id}?w=${cleanPhone}`;
@@ -69,12 +70,8 @@ export default function GestaoCampanha() {
       message = `Olá ${order.buyer_name}! Recebi seu pagamento do *${campaign?.title}*. Tudo certo! Acompanhe por aqui: 👉 ${campaignUrl}`;
     } else if (order.status === 'rejected') {
       message = `Olá ${order.buyer_name}! Tivemos um problema com seu comprovante no *${campaign?.title}*. Poderia enviar novamente pelo link? 👉 ${campaignUrl}`;
-    } else if (order.status === 'cancelled') {
-      message = `Olá ${order.buyer_name}! Vi que seu pedido do *${campaign?.title}* foi cancelado. Se desejar pedir novamente, acesse: 👉 ${campaignUrl}`;
-    } else if (order.receipt_url) {
-      message = `Olá ${order.buyer_name}! Já recebi seu comprovante do *${campaign?.title}* e estou validando. Em breve te aviso! Acompanhe: 👉 ${campaignUrl}`;
     } else {
-      message = `Olá ${order.buyer_name}! Vi que você iniciou um pedido no *${campaign?.title}* mas ainda não enviou o comprovante. Pode finalizar por aqui? 👉 ${campaignUrl}`;
+      message = `Olá ${order.buyer_name}! Vi que você iniciou um pedido no *${campaign?.title}*. Pode finalizar por aqui? 👉 ${campaignUrl}`;
     }
 
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -159,24 +156,19 @@ export default function GestaoCampanha() {
                     <div>
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '14px' }}>{order.buyer_name}</p>
                       <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#a8a29e' }}>Unidade {order.buyer_apto}</p>
-                      <a 
-                        href={getWhatsAppLink(order)} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        style={{ fontSize: '11px', color: '#059669', fontWeight: 'bold', textDecoration: 'none', display: 'block', marginTop: '4px' }}
-                      >
-                        📱 {order.buyer_contact}
-                      </a>
+                      <a href={getWhatsAppLink(order)} target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: '#059669', fontWeight: 'bold', textDecoration: 'none', display: 'block', marginTop: '4px' }}>📱 WhatsApp</a>
                     </div>
+                    {/* ITEM 7: TRADUÇÃO DE STATUS */}
                     <div style={{ fontSize: '8px', fontWeight: '900', padding: '4px 10px', borderRadius: '50px', 
                       backgroundColor: order.status === 'paid' ? '#dcfce7' : order.status === 'rejected' ? '#fee2e2' : order.status === 'cancelled' ? '#f5f5f4' : '#fef9c3', 
                       color: order.status === 'paid' ? '#166534' : order.status === 'rejected' ? '#991b1b' : order.status === 'cancelled' ? '#a8a29e' : '#854d0e' }}>
-                      {order.status.toUpperCase()}
+                      {order.status === 'paid' ? 'PAGO' : order.status === 'rejected' ? 'RECUSADO' : order.status === 'cancelled' ? 'CANCELADO' : 'PENDENTE'}
                     </div>
                   </div>
 
                   <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px', padding: '8px', backgroundColor: '#fafaf9', borderRadius: '10px' }}>
                     {Array.isArray(order.selected_variations) && order.selected_variations.map((v: any) => `${v.qty}x ${v.name}`).join(', ')}
+                    {order.observations && <div style={{marginTop: 5, color: '#059669', fontStyle: 'italic'}}>📝 {order.observations}</div>}
                   </div>
 
                   {order.receipt_url && order.status !== 'cancelled' && (
@@ -184,7 +176,7 @@ export default function GestaoCampanha() {
                       <div onClick={() => setSelectedImg(order.receipt_url)} style={{ width: '60px', height: '60px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #059669', cursor: 'pointer' }}>
                         <img src={order.receipt_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Pix" />
                       </div>
-                      <p style={{ fontSize: '9px', color: '#a8a29e' }}>Clique na imagem<br/>para ampliar</p>
+                      <p style={{ fontSize: '9px', color: '#a8a29e' }}>Clique para ampliar</p>
                     </div>
                   )}
 

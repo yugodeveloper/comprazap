@@ -116,7 +116,9 @@ function LandingContent() {
     if (!token || !chatId) return;
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
-    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    // ADICIONADO: Observações na mensagem
+    const obsPart = order.observations ? `\n📝 *Obs:* ${order.observations}` : '';
+    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsPart}`;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -202,13 +204,18 @@ function LandingContent() {
     if (!existingOrder || !confirm("Cancelar este pedido?")) return;
     setLoading(true);
     await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
-    setExistingOrder(null); 
-    setOrderStatus('pending'); 
-    setItemsList([]); 
-    setObservations(''); 
-    setStep('itens');
+    setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens');
     setLoading(false);
   };
+
+  // ADICIONADO: Função para remover comprovante
+  const handleRemoveReceipt = async () => {
+    if(!confirm("Remover este comprovante e enviar outro?")) return;
+    setUploading(true);
+    await supabase.from('orders').update({ receipt_url: null }).eq('id', existingOrder.id);
+    setExistingOrder((prev: any) => ({ ...prev, receipt_url: null }));
+    setUploading(false);
+  }
 
   const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !existingOrder) return;
@@ -267,49 +274,19 @@ function LandingContent() {
                 onTouchEnd={() => setIsPaused(false)}
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={() => setIsPaused(false)}
-                style={{ 
-                    display: 'flex', 
-                    overflowX: 'auto', 
-                    scrollSnapType: 'x mandatory', 
-                    WebkitOverflowScrolling: 'touch',
-                    scrollbarWidth: 'none',
-                    borderRadius: '25px',
-                    gap: 0, 
-                }}
+                style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', borderRadius: '25px', gap: 0 }}
               >
                 {loopItems.map((img: string, i: number) => (
-                  <div key={i} style={{ 
-                      minWidth: '100%', 
-                      width: '100%',
-                      height: '400px', 
-                      scrollSnapAlign: 'start', 
-                      flexShrink: 0, 
-                      backgroundColor: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                  }}>
+                  <div key={i} style={{ minWidth: '100%', width: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   </div>
                 ))}
               </div>
-
               <button onClick={() => navScroll('left')} style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>‹</button>
               <button onClick={() => navScroll('right')} style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>›</button>
-
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 15 }}>
                 {gallery.map((_: any, i: number) => (
-                  <div 
-                    key={i} 
-                    style={{ 
-                        width: activeIndex === i ? 18 : 6,
-                        height: 6, 
-                        borderRadius: '10px', 
-                        backgroundColor: '#059669', 
-                        opacity: activeIndex === i ? 1 : 0.2,
-                        transition: 'all 0.3s ease'
-                    }}
-                  ></div>
+                  <div key={i} style={{ width: activeIndex === i ? 18 : 6, height: 6, borderRadius: '10px', backgroundColor: '#059669', opacity: activeIndex === i ? 1 : 0.2, transition: 'all 0.3s ease' }}></div>
                 ))}
               </div>
             </div>
@@ -347,23 +324,6 @@ function LandingContent() {
                   </div>
                   <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
                </div>
-               {pastOrders.length > 0 && (
-                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', marginTop: 10, paddingTop: 10 }}>
-                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
-                    {showHistory && (
-                      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {pastOrders.map((order: any) => (
-                          <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
-                              <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                 </div>
-               )}
             </div>
           )}
 
@@ -403,32 +363,25 @@ function LandingContent() {
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
-              <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', marginTop: '20px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0' }}>CONFERIR ITENS</p>
-                  {itemsList.map((item) => (
-                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
-                       <span>{item.qty}x {item.name}</span>
-                       <span style={{ fontWeight: 700 }}>R$ {item.total.toFixed(2)}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
-                    <span>TOTAL</span>
-                    <span style={{ color: '#059669', fontSize: '16px' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</span>
-                  </div>
-              </div>
             </div>
           )}
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
-                {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : 'Aguardando Pagamento'}
+              <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
+                {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '❌ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
-              <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
-              <p style={{ fontWeight: 900, fontSize: 20, color: '#059669', margin: '15px 0' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
-              <button onClick={copyPix} style={{ ...btnStyle, marginTop: 0 }}>COPIAR PIX</button>
+
+              {/* ITEM 8: QR CODE E COPIAR PIX SÓ SE NÃO ESTIVER PAGO */}
+              {orderStatus !== 'paid' && (
+                <>
+                  <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
+                  <p style={{ fontWeight: 900, fontSize: 20, color: '#059669', margin: '15px 0' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
+                  <button onClick={copyPix} style={{ ...btnStyle, marginTop: 0, marginBottom: 20 }}>COPIAR CHAVE PIX</button>
+                </>
+              )}
               
-              <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', margin: '20px 0' }}>
+              <div style={{ background: 'white', padding: '15px', borderRadius: '20px', border: '1px solid #eee', textAlign: 'left', margin: '10px 0' }}>
                   <p style={{ fontSize: '10px', fontWeight: 900, color: '#999', margin: '0 0 10px 0', textAlign: 'center' }}>DETALHES DO PEDIDO</p>
                   {itemsList.map((item) => (
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' }}>
@@ -437,13 +390,42 @@ function LandingContent() {
                     </div>
                   ))}
                   <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
-                    <span>TOTAL PAGO</span>
+                    <span>{orderStatus === 'paid' ? 'TOTAL PAGO' : 'TOTAL'}</span>
                     <span style={{ color: '#059669', fontSize: '16px' }}>R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</span>
                   </div>
               </div>
 
-              <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} />
-              {!existingOrder?.receipt_url && <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', marginTop: 20, cursor: 'pointer' }}>CANCELAR PEDIDO</button>}
+              {/* ITEM 9: DESIGN DO COMPROVANTE MELHORADO */}
+              <div style={{ marginTop: 20, padding: 15, backgroundColor: '#f8fafc', borderRadius: 20, border: '2px dashed #e2e8f0' }}>
+                <p style={{ fontSize: 11, fontWeight: 900, color: '#64748b', marginBottom: 10 }}>COMPROVANTE PIX</p>
+                
+                {existingOrder?.receipt_url ? (
+                  <div style={{ position: 'relative', width: '100px', margin: '0 auto' }}>
+                    <img 
+                      src={existingOrder.receipt_url} 
+                      style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: 10, cursor: 'pointer', border: '2px solid #059669' }} 
+                      onClick={() => window.open(existingOrder.receipt_url, '_blank')}
+                    />
+                    <button 
+                      onClick={handleRemoveReceipt}
+                      style={{ position: 'absolute', top: -10, right: -10, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold' }}
+                    >✕</button>
+                    <p style={{ fontSize: 9, color: '#059669', fontWeight: 900, marginTop: 5 }}>ENVIADO!</p>
+                  </div>
+                ) : (
+                  <label style={{ display: 'block', padding: '15px', backgroundColor: 'white', borderRadius: 15, border: '1px solid #cbd5e1', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 12, fontWeight: 900, color: '#059669' }}>{uploading ? 'ENVIANDO...' : '➕ CLIQUE PARA ENVIAR'}</span>
+                    <input type="file" accept="image/*" hidden onChange={handleUploadComprovante} disabled={uploading} />
+                  </label>
+                )}
+              </div>
+
+              {/* ITEM 4: BOTÃO PARA REINICIAR / NOVO PEDIDO APÓS PAGO */}
+              {orderStatus === 'paid' && (
+                <button onClick={handleLogout} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
+              )}
+
+              {!existingOrder?.receipt_url && orderStatus !== 'paid' && <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', marginTop: 20, cursor: 'pointer', fontSize: 12 }}>CANCELAR PEDIDO</button>}
             </div>
           )}
 

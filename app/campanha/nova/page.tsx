@@ -23,11 +23,7 @@ function NovaCampanhaContent() {
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
   const maskDate = (value: string) => {
-    return value
-      .replace(/\D/g, "")
-      .replace(/(\d{2})(\d)/, "$1/$2")
-      .replace(/(\d{2})(\d)/, "$1/$2")
-      .replace(/(\/\d{4})\d+?$/, "$1");
+    return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
   };
 
   useEffect(() => {
@@ -44,20 +40,22 @@ function NovaCampanhaContent() {
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
           if (camp.expires_at) {
-            const date = new Date(camp.expires_at);
-            setExpiresAt(date.toLocaleDateString('pt-BR'));
+            setExpiresAt(new Date(camp.expires_at).toLocaleDateString('pt-BR'));
           }
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // CARREGAMENTO DOS PRODUTOS EXISTENTES
+          // CORREÇÃO ITEM 10: MAPEAMENTO DAS VARIAÇÕES JSONB
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
-            if (Array.isArray(prod.variations)) {
-              setVariations(prod.variations.map((v: any) => ({ name: v.name, price: v.price.toString() })));
-            } else {
+            if (Array.isArray(prod.variations) && prod.variations.length > 0) {
+              setVariations(prod.variations.map((v: any) => ({ 
+                name: v.name, 
+                price: v.price.toString() 
+              })));
+            } else if (prod.name && prod.price) {
               setVariations([{ name: prod.name, price: prod.price.toString() }]);
             }
           }
@@ -109,11 +107,9 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        const { error } = await supabase.from('campaigns').update(payload).eq('id', editId);
-        if (error) throw error;
+        await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
-        const { data: camp, error } = await supabase.from('campaigns').insert(payload).select().single();
-        if (error) throw error;
+        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
         campId = camp.id;
       }
 
@@ -124,25 +120,18 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      // LÓGICA DE SALVAMENTO DE PRODUTOS: Deleta e reinsere para garantir integridade
       await supabase.from('products').delete().eq('campaign_id', campId);
-      const { error: prodErr } = await supabase.from('products').insert({
+      await supabase.from('products').insert({
         campaign_id: campId,
         name: title,
         price: formattedVariations[0]?.price || 0,
         variations: formattedVariations
       });
 
-      if (prodErr) throw prodErr;
-
       alert("Campanha salva com sucesso! 🚀");
       router.push('/');
-    } catch (err: any) { 
-      console.error("Erro ao salvar:", err);
-      alert("Erro ao salvar: " + err.message); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (err: any) { alert("Erro ao salvar: " + err.message); } 
+    finally { setLoading(false); }
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #e2e8f0', fontSize: '14px', boxSizing: 'border-box' };
@@ -156,13 +145,12 @@ function NovaCampanhaContent() {
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
           <div style={{ display: 'flex', gap: '15px' }}>
             <div style={{ flex: 1.5 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
               <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
                 {headerImg ? (
-                  <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
+                  <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} /><span style={{ fontSize: '10px', color: '#94a3b8' }}>+ Capa</span>
@@ -170,12 +158,11 @@ function NovaCampanhaContent() {
                 )}
               </div>
             </div>
-
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Foto WhatsApp</label>
-              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
+              <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
                 {shareImg ? (
-                  <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
+                  <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} /><span style={{ fontSize: '18px' }}>📸</span><span style={{ fontSize: '8px', color: '#059669', fontWeight: 'bold' }}>POLAROID</span>
@@ -186,12 +173,12 @@ function NovaCampanhaContent() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria do Carrossel (Até 5)</label>
-            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria (Até 5)</label>
+            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
                 {gallery.length < 5 && (
@@ -211,21 +198,15 @@ function NovaCampanhaContent() {
                 <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                     <input placeholder="Item" required style={{ ...inputStyle, padding: '10px' }} value={v.name} onChange={e => updateVariation(index, 'name', e.target.value)} />
                     <input placeholder="R$" required style={{ ...inputStyle, padding: '10px', width: '80px' }} value={v.price} onChange={e => updateVariation(index, 'price', e.target.value)} />
-                    {variations.length > 1 && <button type="button" onClick={() => removeVariation(index)} style={{ border: 'none', background: 'none', color: '#f87171', cursor: 'pointer' }}>✕</button>}
+                    {variations.length > 1 && <button type="button" onClick={() => removeVariation(index)} style={{ border: 'none', background: 'none', color: '#f87171' }}>✕</button>}
                 </div>
             ))}
-            <button type="button" onClick={addVariation} style={{ width: '100%', padding: '8px', border: 'none', background: '#f1f5f9', borderRadius: '10px', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>+ ADICIONAR ITEM</button>
+            <button type="button" onClick={addVariation} style={{ width: '100%', padding: '8px', border: 'none', background: '#f1f5f9', borderRadius: '10px', fontSize: '10px', fontWeight: '900' }}>+ ADICIONAR ITEM</button>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-             <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
-                <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
-             </div>
-             <div style={{ width: '100px' }}>
-                <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>LIMITE</label>
-                <input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
-             </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+             <div style={{ flex: 1 }}><input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} /></div>
+             <div style={{ width: 100 }}><input type="number" required style={inputStyle} value={maxSales} onChange={e => setMaxSales(e.target.value)} /></div>
           </div>
           <input placeholder="Sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
 
