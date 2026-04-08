@@ -49,7 +49,6 @@ function NovaCampanhaContent() {
           
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
-            // CORREÇÃO ITEM 6: Lógica para carregar as variações no estado
             let loadedVars = [];
             if (Array.isArray(prod.variations)) {
               loadedVars = prod.variations;
@@ -58,7 +57,11 @@ function NovaCampanhaContent() {
             }
             
             if (loadedVars.length > 0) {
-              setVariations(loadedVars.map((v: any) => ({ name: v.name, price: v.price.toString() })));
+              // CORREÇÃO: Forçando o mapeamento para garantir que o React renderize a lista
+              setVariations(loadedVars.map((v: any) => ({ 
+                name: v.name, 
+                price: v.price.toString() 
+              })));
             }
           }
         }
@@ -139,7 +142,6 @@ function NovaCampanhaContent() {
       if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
-      // CORREÇÃO ITEM 1: Redirecionamento forçado para a Home
       window.location.href = '/';
     } catch (err: any) { 
       console.error("Erro detalhado:", err);
