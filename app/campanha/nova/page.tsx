@@ -79,9 +79,8 @@ function NovaCampanhaContent() {
     try {
       const userId = localStorage.getItem('user_id')
       
-      // FORÇANDO O NULL: Se headerImg for uma string vazia, enviamos null.
-      // Isso limpa a coluna image_url no banco de dados.
-      const imageUrlToSave = headerImg && headerImg.trim() !== '' ? headerImg : null;
+      // CRUCIAL: Se a string estiver vazia (você clicou no X), enviamos NULL para o Postgres apagar.
+      const finalImageUrl = headerImg && headerImg.length > 0 ? headerImg : null;
 
       const payload = {
         title, 
@@ -89,7 +88,7 @@ function NovaCampanhaContent() {
         pix_key: pixKey, 
         expires_at: expiresAt,
         max_sales: parseInt(maxSales), 
-        image_url: imageUrlToSave, 
+        image_url: finalImageUrl, 
         image_gallery: gallery, 
         creator_id: userId, 
         status: 'active'
@@ -118,20 +117,12 @@ function NovaCampanhaContent() {
         name: v.name, price: parseFloat(v.price.replace(',', '.'))
       }))
 
-      if (editId) {
-        await supabase.from('products').update({ 
-          name: title, 
-          price: formattedVariations[0].price, 
-          variations: formattedVariations 
-        }).eq('campaign_id', editId);
-      } else {
-        await supabase.from('products').insert({ 
-          campaign_id: campId, 
-          name: title, 
-          price: formattedVariations[0].price, 
-          variations: formattedVariations 
-        });
-      }
+      // Atualiza o produto associado
+      await supabase.from('products').update({ 
+        name: title, 
+        price: formattedVariations[0].price, 
+        variations: formattedVariations 
+      }).eq('campaign_id', campId);
 
       alert("Campanha salva com sucesso! 🚀");
       router.push('/');
@@ -150,7 +141,7 @@ function NovaCampanhaContent() {
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} ⚡</h1>
+          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>Editar Campanha ⚡</h1>
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -159,7 +150,7 @@ function NovaCampanhaContent() {
             {headerImg ? (
               <div style={{ width: '100%', height: '120px', borderRadius: '15px', overflow: 'hidden', position: 'relative' }}>
                 <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '25px', height: '25px', cursor: 'pointer' }}>✕</button>
+                <button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '25px', height: '25px', cursor: 'pointer', zIndex: 10 }}>✕</button>
               </div>
             ) : (
               <label style={{ width: '100%', height: '100px', borderRadius: '15px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: 'white' }}>
@@ -175,7 +166,7 @@ function NovaCampanhaContent() {
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px' }}>✕</button>
+                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
                   </div>
                 ))}
                 {gallery.length < 5 && (
