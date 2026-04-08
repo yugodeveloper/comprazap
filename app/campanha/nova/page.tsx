@@ -15,7 +15,6 @@ function NovaCampanhaContent() {
   const [pixKey, setPixKey] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [maxSales, setMaxSales] = useState('50')
-  
   const [headerImg, setHeaderImg] = useState('')
   const [shareImg, setShareImg] = useState('') 
   const [gallery, setGallery] = useState<string[]>([])
@@ -29,15 +28,10 @@ function NovaCampanhaContent() {
       const loadEditData = async () => {
         const { data: camp } = await supabase.from('campaigns').select('*, products(*)').eq('id', editId).single();
         if (camp) {
-          setTitle(camp.title || '');
-          setDescription(camp.description || '');
-          setPixKey(camp.pix_key || '');
+          setTitle(camp.title || ''); setDescription(camp.description || ''); setPixKey(camp.pix_key || '');
           if (camp.expires_at) setExpiresAt(new Date(camp.expires_at).toLocaleDateString('pt-BR'));
-          setMaxSales(camp.max_sales?.toString() || '50');
-          setHeaderImg(camp.image_url || '');
-          setShareImg(camp.share_image || '');
+          setMaxSales(camp.max_sales?.toString() || '50'); setHeaderImg(camp.image_url || ''); setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
-          
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
             const loadedVars = Array.isArray(prod.variations) ? prod.variations : [];
@@ -86,13 +80,13 @@ function NovaCampanhaContent() {
 
       const formattedVars = variations.filter(v => v.name && v.price).map(v => ({ name: v.name, price: parseFloat(v.price.toString().replace(',', '.')) }));
 
-      // SALVAMENTO GARANTIDO
+      // SALVAMENTO GARANTIDO DE PRODUTOS
       await supabase.from('products').delete().eq('campaign_id', campId);
       await supabase.from('products').insert({
         campaign_id: campId, name: title, price: formattedVars[0]?.price || 0, variations: formattedVars
       });
 
-      alert("Salvo com sucesso! 🚀"); router.push('/');
+      alert("Campanha salva com sucesso! 🚀"); router.push('/');
     } catch (err: any) { alert("Erro: " + err.message); } finally { setLoading(false); }
   };
 
@@ -102,53 +96,53 @@ function NovaCampanhaContent() {
         <h1 style={{ fontSize: '18px', fontWeight: '900' }}>{editId ? 'Editar' : 'Nova'} Campanha ⚡</h1>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <label style={{ flex: 1, height: '80px', border: '2px dashed #ddd', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', backgroundColor:'white' }}>
+            <label style={{ flex: 1, height: '100px', border: '2px dashed #ddd', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', backgroundColor:'white' }}>
               <input type="file" hidden onChange={e => handleUpload(e, 'header')} />
-              {headerImg ? <img src={headerImg} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : 'Capa Página 🖼️'}
+              {headerImg ? <img src={headerImg} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : 'Capa Página'}
             </label>
-            <label style={{ flex: 1, height: '80px', border: '2px dashed #059669', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', backgroundColor:'white' }}>
+            <label style={{ flex: 1, height: '100px', border: '2px dashed #059669', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', backgroundColor:'white' }}>
               <input type="file" hidden onChange={e => handleUpload(e, 'share')} />
-              {shareImg ? <img src={shareImg} style={{width:'100%', height:'100%', objectFit:'contain'}} /> : 'WhatsApp 📸'}
+              {shareImg ? <img src={shareImg} style={{width:'100%', height:'100%', objectFit:'contain'}} /> : 'Polaroid Card'}
             </label>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8' }}>GALERIA (ATÉ 5)</label>
-            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '5px' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8' }}>GALERIA (ATÉ 5 FOTOS)</label>
+            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
               {gallery.map((img, i) => (
-                <div key={i} style={{ width: '70px', height: '90px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
+                <div key={i} style={{ width: '80px', height: '100px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                   <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px' }}>✕</button>
                 </div>
               ))}
               {gallery.length < 5 && (
-                <label style={{ width: '70px', height: '90px', borderRadius: '8px', border: '2px dashed #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor:'white' }}>
+                <label style={{ width: '80px', height: '100px', borderRadius: '10px', border: '2px dashed #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor:'white' }}>
                   <input type="file" multiple hidden onChange={e => handleUpload(e, 'gallery')} />
-                  <span style={{fontSize:'20px', color:'#999'}}>+</span>
+                  <span style={{fontSize:'24px', color:'#999'}}>+</span>
                 </label>
               )}
             </div>
           </div>
 
           <input placeholder="Título" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={title} onChange={e => setTitle(e.target.value)} />
-          <textarea placeholder="Descrição" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd', height:'100px'}} value={description} onChange={e => setDescription(e.target.value)} />
+          <textarea placeholder="História e sabores..." required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd', height:'120px'}} value={description} onChange={e => setDescription(e.target.value)} />
           
-          <div style={{ background: '#fff', padding: '15px', borderRadius: '20px', border: '1px solid #eee' }}>
-            <p style={{fontSize:'10px', fontWeight:900, color:'#999', marginBottom:'10px', textAlign:'center'}}>ITENS E PREÇOS</p>
+          <div style={{ background: '#fff', padding: '15px', borderRadius: '25px', border: '1px solid #e2e8f0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', display: 'block', marginBottom: '15px', textAlign: 'center' }}>OPÇÕES DE COMPRA</label>
             {variations.map((v, i) => (
-              <div key={i} style={{display:'flex', gap:5, marginBottom:8}}>
-                <input placeholder="Ex: Cuca Mini" style={{flex:2, padding:'10px', borderRadius:'10px', border:'1px solid #ddd'}} value={v.name} onChange={e => { const n = [...variations]; n[i].name = e.target.value; setVariations(n); }} />
-                <input placeholder="R$" style={{flex:1, padding:'10px', borderRadius:'10px', border:'1px solid #ddd'}} value={v.price} onChange={e => { const n = [...variations]; n[i].price = e.target.value; setVariations(n); }} />
+              <div key={i} style={{display:'flex', gap:8, marginBottom:8}}>
+                <input placeholder="Produto" style={{flex:2, padding:'12px', borderRadius:'12px', border:'1px solid #ddd'}} value={v.name} onChange={e => { const n = [...variations]; n[i].name = e.target.value; setVariations(n); }} />
+                <input placeholder="R$" style={{flex:1, padding:'12px', borderRadius:'12px', border:'1px solid #ddd'}} value={v.price} onChange={e => { const n = [...variations]; n[i].price = e.target.value; setVariations(n); }} />
               </div>
             ))}
-            <button type="button" onClick={() => setVariations([...variations, {name:'', price:''}])} style={{width:'100%', padding:'10px', border:'none', background:'#f8fafc', borderRadius:'10px', fontSize:'11px', fontWeight:900, color:'#059669'}}>+ ADICIONAR OPÇÃO</button>
+            <button type="button" onClick={() => setVariations([...variations, {name:'', price:''}])} style={{width:'100%', padding:'10px', border:'none', background:'#f8fafc', borderRadius:'12px', fontSize:'11px', fontWeight:900, color:'#059669'}}>+ NOVO ITEM</button>
           </div>
           
           <div style={{display:'flex', gap:10}}>
-            <input placeholder="Expira em (dd/mm/aaaa)" style={{flex:2, padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
-            <input placeholder="Limite" type="number" style={{flex:1, padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={maxSales} onChange={e => setMaxSales(e.target.value)} />
+            <div style={{flex:1}}><label style={{fontSize:9, fontWeight:900, color:'#999'}}>EXPIRA EM</label><input placeholder="dd/mm/aaaa" style={{width:'100%', padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} /></div>
+            <div style={{width:80}}><label style={{fontSize:9, fontWeight:900, color:'#999'}}>LIMITE</label><input type="number" style={{width:'100%', padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={maxSales} onChange={e => setMaxSales(e.target.value)} /></div>
           </div>
-          <input placeholder="Chave Pix" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={pixKey} onChange={e => setPixKey(e.target.value)} />
+          <input placeholder="Sua Chave Pix" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={pixKey} onChange={e => setPixKey(e.target.value)} />
           <button type="submit" disabled={loading} style={{ padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>{loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}</button>
         </form>
       </div>

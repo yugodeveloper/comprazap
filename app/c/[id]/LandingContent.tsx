@@ -37,6 +37,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
   const maskPhone = (v: string) => v.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
   const copyPix = () => { if (campaign?.pix_key) { navigator.clipboard.writeText(campaign.pix_key); alert("Chave Pix copiada! ✅"); } };
 
+  // Carrossel Infinito Manteiga
   const gallery = campaign?.image_gallery || [];
   const loopItems = gallery.length > 1 ? [gallery[gallery.length - 1], ...gallery, gallery[0]] : gallery;
 
@@ -73,6 +74,36 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     }
   };
 
+  // Funções de Telegram e Comprovante
+  const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const total = itens.reduce((acc, curr) => acc + curr.total, 0);
+    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
+    });
+  };
+
+  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string, total: number) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId, photo: imageUrl,
+        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${total.toFixed(2)}\n\nAceita este pagamento?`,
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
+      })
+    });
+  };
+
+  // Ciclo de Vida e Dados
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   async function fetchData() {
@@ -98,7 +129,6 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     setLoading(true);
     try {
       const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
-      const { data: lastGlobalOrder } = await supabase.from('orders').select('buyer_name, buyer_apto').eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (orders && orders.length > 0) {
         const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
         setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
@@ -109,7 +139,6 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
           setLoading(false); return;
         }
       }
-      if (lastGlobalOrder) { setBuyerName(lastGlobalOrder.buyer_name || ''); setBuyerApto(lastGlobalOrder.buyer_apto || ''); }
       setStep('itens');
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -119,23 +148,41 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     setLoading(true);
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations };
     const { data: savedOrder } = await supabase.from('orders').upsert(existingOrder?.id ? { id: existingOrder.id, ...orderData } : orderData).select().single();
-    setExistingOrder(savedOrder); setStep('concluido'); setLoading(false);
+    setExistingOrder(savedOrder);
+    await enviarNotificacaoTelegram(savedOrder, itemsList);
+    setStep('concluido'); setLoading(false);
   };
 
-  const handleCancelarCompra = async () => {
-    if (!existingOrder || !confirm("Cancelar?")) return;
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
-    setExistingOrder(null); setItemsList([]); setStep('itens');
+  const handleLogout = () => {
+    if(!confirm("Sair deste pedido?")) return;
+    setContact(''); setBuyerName(''); setBuyerApto(''); setExistingOrder(null); setStep('identificacao');
+  };
+
+  const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !existingOrder) return;
+    setUploading(true);
+    const file = e.target.files[0];
+    const fileName = `receipts/${existingOrder.id}-${Date.now()}`;
+    await supabase.storage.from('comprovantes').upload(fileName, file);
+    const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
+    await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
+    setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
+    const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
+    await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id, total);
+    alert("Comprovante enviado! ✅");
+    setUploading(false);
   };
 
   if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando Oferta...</div>
+
+  const headerImage = campaign?.image_url || (campaign?.image_gallery?.length > 0 ? campaign.image_gallery[0] : null);
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px rgba(0,0,0,0.1)' }}>
         
         <div style={{ height: '140px', position: 'relative', overflow: 'hidden', backgroundColor: '#eee' }}>
-          {campaign?.image_url && <img src={campaign.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+          {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>{campaign?.title}</h1>
           </div>
@@ -144,7 +191,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
         <div style={{ padding: '15px 20px' }}>
           {gallery.length > 0 && (
             <div style={{ marginBottom: 25, position: 'relative' }}>
-              <div ref={scrollRef} onScroll={handleScroll} style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', borderRadius: '25px', gap: 0 }}>
+              <div ref={scrollRef} onScroll={handleScroll} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)} onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', borderRadius: '25px', gap: 0 }}>
                 {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ minWidth: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -165,7 +212,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
 
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center', marginTop: 30 }}>
-              <input type="tel" placeholder="WhatsApp" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', textAlign: 'center' }} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
+              <input type="tel" placeholder="Seu WhatsApp" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', textAlign: 'center', fontSize: '18px' }} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={() => identificarUsuario(contact)} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', marginTop: 10 }}>ACESSAR OFERTA</button>
             </div>
           )}
@@ -191,8 +238,8 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
 
           {step === 'dados' && (
             <div style={{ marginTop: 30 }}>
-              <input placeholder="Nome" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: 10 }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-              <input placeholder="Unidade" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              <input placeholder="Seu Nome Completo" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: 10 }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+              <input placeholder="Unidade / Apto" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', marginTop: 20, fontWeight: 900 }}>CONFIRMAR PEDIDO</button>
             </div>
           )}
@@ -202,7 +249,13 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
               <QRCodeSVG value={campaign?.pix_key || ''} size={200} />
               <p style={{fontSize: 20, fontWeight: 900, color: '#059669', marginTop: 15}}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
               <button onClick={copyPix} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900' }}>COPIAR PIX</button>
-              <button onClick={handleLogout} style={{background:'none', border:'none', color:'red', textDecoration:'underline', marginTop:20}}>Sair / Novo Pedido</button>
+              
+              <div style={{marginTop: 20, borderTop: '1px solid #eee', paddingTop: 20}}>
+                <p style={{fontSize: 11, fontWeight: 900, color: '#999'}}>ENVIAR COMPROVANTE</p>
+                <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} style={{fontSize: 12}} />
+              </div>
+              
+              <button onClick={handleLogout} style={{background:'none', border:'none', color:'red', textDecoration:'underline', marginTop:30, cursor:'pointer'}}>Sair / Novo Pedido</button>
             </div>
           )}
         </div>
