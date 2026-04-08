@@ -90,6 +90,12 @@ function LandingContent() {
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
+    
+    // Tenta recuperar telefone da sessão para não pedir de novo
+    const sessionPhone = localStorage.getItem('comprazap_session_phone');
+    if (sessionPhone && !contact && !autoPhone) {
+      setContact(maskPhone(sessionPhone));
+    }
   }, [id]);
 
   useEffect(() => {
@@ -97,10 +103,18 @@ function LandingContent() {
   }, [itemsList, id]);
 
   const handleLogout = () => {
-    if(!confirm("Deseja alterar o usuário ou fazer outro pedido?")) return;
+    if(!confirm("Deseja usar outro número de WhatsApp?")) return;
     localStorage.removeItem(`cart_${id}`);
+    localStorage.removeItem('comprazap_session_phone');
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
+  };
+
+  const handleNovoPedido = () => {
+    if(!confirm("Iniciar uma nova compra?")) return;
+    localStorage.removeItem(`cart_${id}`);
+    setItemsList([]); setExistingOrder(null); setObservations('');
+    setStep('itens'); // Volta para os itens sem pedir telefone
   };
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
@@ -123,15 +137,15 @@ function LandingContent() {
     if (!phoneToAuth || phoneToAuth.length < 10) return;
     setLoading(true);
     try {
+      localStorage.setItem('comprazap_session_phone', phoneToAuth.replace(/\D/g, ""));
       const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
       
       if (orders && orders.length > 0) {
-        // CORREÇÃO: Recupera os dados do comprador para preencher os campos automaticamente
-        const lastOrder = orders[0];
-        setBuyerName(lastOrder.buyer_name || '');
-        setBuyerApto(lastOrder.buyer_apto || '');
+        setBuyerName(orders[0].buyer_name || '');
+        setBuyerApto(orders[0].buyer_apto || '');
         setPastOrders(orders.filter((o: any) => o.status === 'paid'));
 
+        // Se houver um pedido pendente OU pago nesta campanha, mostra a tela final
         const activeOrder = orders.find((o: any) => o.status !== 'cancelled');
         
         if (activeOrder) {
@@ -139,12 +153,10 @@ function LandingContent() {
           setOrderStatus(activeOrder.status); 
           setObservations(activeOrder.observations || '');
           setItemsList(activeOrder.selected_variations || []); 
-          setStep('concluido'); // Se houver pedido ativo, vai direto para o checkout
-          setLoading(false); 
-          return;
+          setStep('concluido');
+          setLoading(false); return;
         }
       }
-      // Se não tem pedido ativo, vai para a escolha de itens, mas com o nome já preenchido se ele existir
       setStep('itens');
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -233,13 +245,6 @@ function LandingContent() {
     setUploading(false);
   };
 
-  const InfoBadge = ({label, value}: {label: string, value: string}) => (
-    <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
-      <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</p>
-      <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{value}</p>
-    </div>
-  );
-
   const containerStyle: React.CSSProperties = { maxWidth: '450px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh', boxShadow: '0 10px 15px rgba(0,0,0,0.1)', fontFamily: 'sans-serif' };
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', fontSize: '16px' };
@@ -253,16 +258,25 @@ function LandingContent() {
       <div style={containerStyle}>
         
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
-          {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+          {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>{campaign?.title}</h1>
           </div>
         </div>
 
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
-          <InfoBadge label="Local" value="Cond. Lanai" />
-          <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
-          <InfoBadge label="Vizinhos" value={`${totalBuyers} já pediram`} />
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Local</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>Cond. Lanai</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Expira</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'}</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px' }}>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Vizinhos</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{totalBuyers} já pediram</p>
+          </div>
         </div>
 
         <div style={{ padding: '15px 20px' }}>
@@ -279,7 +293,7 @@ function LandingContent() {
               >
                 {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ minWidth: '100%', width: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
                   </div>
                 ))}
               </div>
@@ -293,16 +307,14 @@ function LandingContent() {
             </div>
           )}
 
-          <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
-            <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{campaign?.description}</p>
-          </div>
+          <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{campaign?.description}</p>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25, marginTop: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
-              {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
+              <button onClick={handleLogout} style={{ fontSize: 9, fontWeight: 900, color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 12px', borderRadius: 50, cursor:'pointer' }}>ALTERAR NÚMERO</button>
           </div>
 
           {step === 'identificacao' && (
@@ -310,19 +322,6 @@ function LandingContent() {
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={() => identificarUsuario(contact)} style={btnStyle}>ACESSAR OFERTA</button>
-            </div>
-          )}
-
-          {step !== 'identificacao' && (
-            <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
-               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{fontSize: '11px'}}>
-                      <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
-                      <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
-                      <p style={{margin: '2px 0 0 0', fontWeight: 900, fontSize: '10px'}}>{contact}</p>
-                  </div>
-                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
-               </div>
             </div>
           )}
 
@@ -408,9 +407,7 @@ function LandingContent() {
                 )}
               </div>
 
-              {orderStatus === 'paid' && (
-                <button onClick={handleLogout} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
-              )}
+              <button onClick={handleNovoPedido} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
 
               {!existingOrder?.receipt_url && orderStatus !== 'paid' && <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', marginTop: 20, cursor: 'pointer', fontSize: 12 }}>CANCELAR PEDIDO</button>}
             </div>
