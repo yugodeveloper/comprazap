@@ -67,7 +67,6 @@ function NovaCampanhaContent() {
   const addVariation = () => setVariations([...variations, { name: '', price: '' }])
   const removeVariation = (index: number) => setVariations(variations.filter((_, i) => i !== index))
   
-  // FUNÇÃO CORRIGIDA (DENTRO DO COMPONENTE)
   const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
     const newVars = [...variations]
     newVars[index][field] = value
@@ -80,13 +79,17 @@ function NovaCampanhaContent() {
     try {
       const userId = localStorage.getItem('user_id')
       
+      // FORÇANDO O NULL: Se headerImg for uma string vazia, enviamos null.
+      // Isso limpa a coluna image_url no banco de dados.
+      const imageUrlToSave = headerImg && headerImg.trim() !== '' ? headerImg : null;
+
       const payload = {
         title, 
         description, 
         pix_key: pixKey, 
         expires_at: expiresAt,
         max_sales: parseInt(maxSales), 
-        image_url: headerImg || null, // Garante a exclusão no banco enviando null
+        image_url: imageUrlToSave, 
         image_gallery: gallery, 
         creator_id: userId, 
         status: 'active'
@@ -94,10 +97,19 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        const { error: updErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
+        const { error: updErr } = await supabase
+          .from('campaigns')
+          .update(payload)
+          .eq('id', editId);
+        
         if (updErr) throw updErr;
       } else {
-        const { data: camp, error: insErr } = await supabase.from('campaigns').insert(payload).select().single();
+        const { data: camp, error: insErr } = await supabase
+          .from('campaigns')
+          .insert(payload)
+          .select()
+          .single();
+        
         if (insErr) throw insErr;
         campId = camp.id;
       }
@@ -107,12 +119,21 @@ function NovaCampanhaContent() {
       }))
 
       if (editId) {
-        await supabase.from('products').update({ name: title, price: formattedVariations[0].price, variations: formattedVariations }).eq('campaign_id', editId);
+        await supabase.from('products').update({ 
+          name: title, 
+          price: formattedVariations[0].price, 
+          variations: formattedVariations 
+        }).eq('campaign_id', editId);
       } else {
-        await supabase.from('products').insert({ campaign_id: campId, name: title, price: formattedVariations[0].price, variations: formattedVariations });
+        await supabase.from('products').insert({ 
+          campaign_id: campId, 
+          name: title, 
+          price: formattedVariations[0].price, 
+          variations: formattedVariations 
+        });
       }
 
-      alert("Oferta salva com sucesso! 🚀");
+      alert("Campanha salva com sucesso! 🚀");
       router.push('/');
       router.refresh();
     } catch (err: any) { 
@@ -129,7 +150,7 @@ function NovaCampanhaContent() {
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Oferta' : 'Criar Oferta'} ⚡</h1>
+          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} ⚡</h1>
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -149,12 +170,12 @@ function NovaCampanhaContent() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Fotos Detalhadas (Carrossel)</label>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria do Carrossel (Até 5)</label>
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
+                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px' }}>✕</button>
                   </div>
                 ))}
                 {gallery.length < 5 && (
@@ -166,11 +187,11 @@ function NovaCampanhaContent() {
             </div>
           </div>
 
-          <input placeholder="Título" required style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
+          <input placeholder="Título da Campanha" required style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} />
           <textarea placeholder="História e sabores..." required style={{ ...inputStyle, height: '120px' }} value={description} onChange={e => setDescription(e.target.value)} />
 
           <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '25px', border: '1px solid #e2e8f0' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '15px', textAlign: 'center' }}>Variações de Preço</label>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '15px', textAlign: 'center' }}>Variações e Preços</label>
             {variations.map((v, index) => (
                 <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                     <input placeholder="Item" required style={{ ...inputStyle, padding: '10px' }} value={v.name} onChange={e => updateVariation(index, 'name', e.target.value)} />
@@ -194,7 +215,7 @@ function NovaCampanhaContent() {
           <input placeholder="Sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
 
           <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
-            {loading ? 'SALVANDO...' : 'SALVAR OFERTA 🚀'}
+            {loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}
           </button>
         </form>
       </div>
