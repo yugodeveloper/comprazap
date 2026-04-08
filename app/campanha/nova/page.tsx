@@ -89,35 +89,31 @@ function NovaCampanhaContent() {
       const userId = localStorage.getItem('user_id')
       if (!userId) throw new Error("Usuário não identificado.");
 
-      // LÓGICA DE LIMPEZA EXPLÍCITA:
-      // Se a string estiver vazia, enviamos null. Se não, enviamos a URL.
-      const dbImageUrl = headerImg && headerImg.trim() !== '' ? headerImg : null;
-      const dbGallery = gallery && gallery.length > 0 ? gallery : [];
-
       const payload = {
         title: title,
         description: description,
         pix_key: pixKey,
         expires_at: expiresAt,
         max_sales: parseInt(maxSales),
-        image_url: dbImageUrl, // Aqui vai null se tiver apagado no UI
-        image_gallery: dbGallery,
+        image_url: headerImg || null, // Força limpeza se estiver vazio
+        image_gallery: gallery || [],
         creator_id: userId,
         status: 'active'
       };
 
-      let campId = editId;
-
       if (editId) {
-        // Na edição, usamos update
-        const { error: updErr } = await supabase
+        // EDIÇÃO
+        const { data, error, count } = await supabase
           .from('campaigns')
           .update(payload)
-          .eq('id', editId);
-        
-        if (updErr) throw updErr;
+          .eq('id', editId)
+          .select(); // Forçamos o select para confirmar se alterou algo
+
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error("A campanha não foi encontrada ou você não tem permissão para editá-la.");
+
       } else {
-        // Na criação, usamos insert
+        // CRIAÇÃO
         const { data: camp, error: insErr } = await supabase
           .from('campaigns')
           .insert(payload)
@@ -125,7 +121,6 @@ function NovaCampanhaContent() {
           .single();
         
         if (insErr) throw insErr;
-        campId = camp.id;
       }
 
       const formattedVariations = variations.map(v => ({
@@ -137,20 +132,17 @@ function NovaCampanhaContent() {
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({ 
-          campaign_id: campId, 
+          campaign_id: editId || null, // Se for novo, o Supabase trata via campaign_id
           name: title, 
           price: formattedVariations[0].price, 
           variations: formattedVariations 
         }, { onConflict: 'campaign_id' });
 
-      if (prodErr) console.error("Erro Produto:", prodErr);
-
-      alert("Campanha guardada com sucesso! 🚀");
-      
-      // Forçar refresh total para garantir que o cache não mostre a imagem antiga
+      alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/'; 
     } catch (err: any) { 
-      alert("Erro ao guardar: " + err.message); 
+      alert("Erro ao salvar: " + err.message); 
+      console.error(err);
     } finally { 
       setLoading(false); 
     }
