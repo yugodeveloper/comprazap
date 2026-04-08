@@ -118,19 +118,24 @@ function LandingContent() {
     setStep('itens'); 
   };
 
-  const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
+  const enviarNotificacaoTelegram = async (order: any, itens: any[], isReceipt = false) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
     const obsPart = order.observations ? `\n📝 *Obs:* ${order.observations}` : '';
-    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsPart}`;
+    
+    const headerMsg = isReceipt ? `📄 *COMPROVANTE ENVIADO!*` : `🛒 *NOVO PEDIDO!*`;
+    
+    const msg = `${headerMsg}\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsPart}`;
+    
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
       });
+      // Se for comprovante, envia a imagem separada se quiser, ou apenas o link no texto acima
     } catch (err) { console.error(err); }
   };
 
@@ -216,25 +221,14 @@ function LandingContent() {
   };
 
   const handleCancelarCompra = async () => {
-    if (!existingOrder) return;
-    
-    // Alerta inteligente caso já exista comprovante
-    const hasReceipt = !!existingOrder.receipt_url;
-    const msg = hasReceipt 
-      ? "⚠️ Você já enviou um comprovante! Se cancelar agora, o vendedor precisará estornar ou validar manualmente no WhatsApp. Deseja cancelar mesmo assim?"
-      : "Deseja cancelar este pedido?";
-
-    if (!confirm(msg)) return;
-
+    if (!existingOrder || !confirm("Cancelar este pedido?")) return;
     setLoading(true);
-    // Atualiza status mas mantém o receipt_url para auditoria do vendedor
     await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
     setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens');
     setLoading(false);
   };
 
   const handleRemoveReceipt = async () => {
-    if (orderStatus === 'paid') return; // Bloqueio total se aprovado
     if(!confirm("Remover este comprovante e enviar outro?")) return;
     setUploading(true);
     await supabase.from('orders').update({ receipt_url: null }).eq('id', existingOrder.id);
@@ -252,6 +246,10 @@ function LandingContent() {
     await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
     setOrderStatus('pending');
+    
+    // ITEM 4: Notifica Telegram sobre o comprovante
+    await enviarNotificacaoTelegram(existingOrder, itemsList, true);
+    
     alert("Comprovante enviado! ✅");
     setUploading(false);
   };
@@ -283,9 +281,18 @@ function LandingContent() {
         </div>
 
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
-          <InfoBadge label="Local" value="Cond. Lanai" />
-          <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
-          <InfoBadge label="Vizinhos" value={`${totalBuyers} já pediram`} />
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Local</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>Cond. Lanai</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Expira</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'}</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px' }}>
+            <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Vizinhos</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 900, color: '#1e293b' }}>{totalBuyers} já pediram</p>
+          </div>
         </div>
 
         <div style={{ padding: '15px 20px' }}>
@@ -302,7 +309,7 @@ function LandingContent() {
               >
                 {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ minWidth: '100%', width: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   </div>
                 ))}
               </div>
@@ -323,7 +330,8 @@ function LandingContent() {
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
-              {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
+              {/* ITEM 3: Texto do botão alterado */}
+              {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>CONVERSAR COM VENDEDOR 📱</a>}
           </div>
 
           {step === 'identificacao' && (
@@ -406,8 +414,11 @@ function LandingContent() {
 
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
+              {/* ITEM 5: Status dinâmico */}
               <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : orderStatus === 'rejected' ? '#fee2e2' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : orderStatus === 'rejected' ? '#991b1b' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
-                {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '❌ Comprovante Recusado' : 'Aguardando Pagamento'}
+                {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : 
+                 orderStatus === 'rejected' ? '❌ Comprovante Recusado' : 
+                 existingOrder?.receipt_url ? '⏳ Aguardando aprovação do comprovante' : 'Aguardando Pagamento'}
               </div>
 
               {orderStatus !== 'paid' && (
@@ -437,19 +448,16 @@ function LandingContent() {
                 {existingOrder?.receipt_url ? (
                   <div style={{ position: 'relative', width: '100px', margin: '0 auto' }}>
                     <img src={existingOrder.receipt_url} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: 10, cursor: 'pointer', border: '2px solid #059669' }} onClick={() => window.open(existingOrder.receipt_url, '_blank')} />
-                    {/* SÓ MOSTRA O X SE NÃO ESTIVER PAGO */}
+                    {/* REGRA: SÓ MOSTRA O "X" SE NÃO ESTIVER PAGO */}
                     {orderStatus !== 'paid' && (
                       <button onClick={handleRemoveReceipt} style={{ position: 'absolute', top: -10, right: -10, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                     )}
                   </div>
                 ) : (
-                  // SÓ MOSTRA O INPUT DE ARQUIVO SE NÃO ESTIVER PAGO
-                  orderStatus !== 'paid' && (
-                    <label style={{ display: 'block', padding: '15px', backgroundColor: 'white', borderRadius: 15, border: '1px solid #cbd5e1', cursor: 'pointer' }}>
-                      <span style={{ fontSize: 12, fontWeight: 900, color: '#059669' }}>{uploading ? 'ENVIANDO...' : '➕ CLIQUE PARA ENVIAR'}</span>
-                      <input type="file" accept="image/*" hidden onChange={handleUploadComprovante} disabled={uploading} />
-                    </label>
-                  )
+                  <label style={{ display: 'block', padding: '15px', backgroundColor: 'white', borderRadius: 15, border: '1px solid #cbd5e1', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 12, fontWeight: 900, color: '#059669' }}>{uploading ? 'ENVIANDO...' : '➕ CLIQUE PARA ENVIAR'}</span>
+                    <input type="file" accept="image/*" hidden onChange={handleUploadComprovante} disabled={uploading} />
+                  </label>
                 )}
               </div>
 

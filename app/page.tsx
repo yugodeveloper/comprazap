@@ -230,6 +230,8 @@ export default function PortalCondominio() {
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
                       <div style={{display: 'flex', gap: '5px', alignItems: 'center'}}>
                         <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
+                        {/* ITEM 2: Texto de validade adicionado */}
+                        {!isExpired && camp.expires_at && <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase' }}>| Expira em: {new Date(camp.expires_at).toLocaleDateString('pt-BR')}</p>}
                         {pendingAproval > 0 && <span style={{backgroundColor: '#f59e0b', color: 'white', fontSize: '6px', padding: '2px 4px', borderRadius: '4px', fontWeight: 900}}>🔔 {pendingAproval} AGUARDANDO PIX</span>}
                       </div>
                     </div>
