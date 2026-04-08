@@ -244,7 +244,7 @@ export default function PortalCondominio() {
                     <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PAGOS</p></div>
                   </div>
 
-                  {/* AJUSTE: BOTÕES DE AÇÃO COM EDITAR */}
+                  {/* AJUSTE: BOTÕES DE AÇÃO COM EDITAR INTEGRADO */}
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR VENDAS</button>
                     

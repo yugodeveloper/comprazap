@@ -31,6 +31,31 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+
+  // --- NOVA LÓGICA DO CARROSSEL: AUTO-SCROLL + ROLAGEM MANUAL ---
+  useEffect(() => {
+    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1) return;
+
+    const scrollInterval = setInterval(() => {
+      // Só move automaticamente se o usuário NÃO estiver tocando ou arrastando
+      if (carouselRef.current && !isUserInteracting) {
+        const { scrollLeft, clientWidth, scrollWidth } = carouselRef.current;
+        
+        // Se chegar no fim, volta pro começo (loop)
+        if (scrollLeft + clientWidth >= scrollWidth - 5) {
+          carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          // Move um "passo" (uma largura de foto)
+          carouselRef.current.scrollBy({ left: clientWidth * 0.8, behavior: 'smooth' });
+        }
+      }
+    }, 4000); // Tenta mover a cada 4 segundos
+
+    return () => clearInterval(scrollInterval);
+  }, [campaign, isUserInteracting]);
+
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
   };
@@ -202,29 +227,13 @@ function LandingContent() {
 
   if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando...</div>
 
-  // LÓGICA DE FALLBACK DO HEADER
   const headerImage = campaign?.image_url || (campaign?.image_gallery?.length > 0 ? campaign.image_gallery[0] : null);
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
-      {/* CSS PARA O CARROSSEL ANIMADO MARQUEE */}
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee {
-          display: flex;
-          animation: marquee 25s linear infinite;
-        }
-        .animate-marquee:active {
-          animation-play-state: paused;
-        }
-      `}</style>
-
       <div style={containerStyle}>
         
-        {/* 1. HEADER (CAPA COMPRIDA COM FALLBACK) */}
+        {/* HEADER */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -232,7 +241,7 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* 2. DADOS RÁPIDOS */}
+        {/* INFO */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -241,29 +250,45 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* 3. CARROSSEL DINÂMICO MARQUEE (Apenas se houver galeria) */}
+          {/* CARROSSEL MELHORADO: AUTO-SCROLL + ARRASTE MANUAL */}
           {campaign?.image_gallery?.length > 0 && (
-            <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', marginBottom: 25, borderRadius: '20px', cursor: 'grab' }}>
-              <div className="animate-marquee">
-                {/* Duplicamos a lista para criar o loop infinito visual */}
-                {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
-                  <div key={i} style={{ minWidth: '280px', height: '380px', marginRight: '12px', flexShrink: 0, borderRadius: '20px', overflow: 'hidden' }}>
+            <div style={{ marginBottom: 25 }}>
+              <div 
+                ref={carouselRef}
+                onMouseDown={() => setIsUserInteracting(true)}
+                onMouseUp={() => setIsUserInteracting(false)}
+                onTouchStart={() => setIsUserInteracting(true)}
+                onTouchEnd={() => setIsUserInteracting(false)}
+                style={{ 
+                    display: 'flex', 
+                    overflowX: 'auto', 
+                    scrollSnapType: 'x mandatory', 
+                    scrollbarWidth: 'none', 
+                    gap: 12,
+                    cursor: 'grab',
+                    WebkitOverflowScrolling: 'touch' // Garante rolagem fluida no iOS
+                }}
+              >
+                {campaign.image_gallery.map((img: string, i: number) => (
+                  <div key={i} style={{ minWidth: '85%', height: '380px', scrollSnapAlign: 'center', borderRadius: '25px', overflow: 'hidden', backgroundColor: '#f1f5f9', position: 'relative', flexShrink: 0 }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: 900 }}>
+                       {i+1} / {campaign.image_gallery.length}
+                    </div>
                   </div>
                 ))}
               </div>
-              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>Toque e segure para pausar</p>
+              <p style={{ textAlign: 'center', fontSize: '9px', color: '#94a3b8', fontWeight: 900, marginTop: 12, textTransform: 'uppercase', letterSpacing: '1px' }}>➔ Deslize para ver detalhes</p>
             </div>
           )}
 
-          {/* 4. DESCRIÇÃO PRE-WRAP */}
+          {/* DESCRIÇÃO PRE-WRAP */}
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
               {campaign?.description}
             </p>
           </div>
 
-          {/* 5. VENDEDOR */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
@@ -272,7 +297,6 @@ function LandingContent() {
               {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
           </div>
 
-          {/* FLUXO DE COMPRA (MANTIDO ÍNTEGRO) */}
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
@@ -293,7 +317,7 @@ function LandingContent() {
                </div>
                {pastOrders.length > 0 && (
                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', marginTop: 10, paddingTop: 10 }}>
-                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
+                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
                     {showHistory && (
                       <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {pastOrders.map((order: any) => (
@@ -331,7 +355,7 @@ function LandingContent() {
               </div>
               {itemsList.length > 0 && (
                 <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20, border: '1px solid #dcfce7' }}>
-                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 13 }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> ))}
+                  {itemsList.map((item) => ( <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}> <div><span style={{ fontWeight: 900 }}>{item.qty}x</span> {item.name}</div> <button onClick={() => setItemsList(itemsList.filter(i => i.id !== item.id))} style={{ background: 'none', border: 'none', color: '#ef4444' }}>✕</button> </div> ))}
                   <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</div>
                   <textarea placeholder="Obs (ex: Sem canela)..." style={{width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '12px', marginTop: 10, fontFamily: 'sans-serif', outline: 'none'}} rows={2} value={observations} onChange={e => setObservations(e.target.value)} />
                   <button onClick={() => setStep('dados')} style={btnStyle}>PRÓXIMO PASSO</button>

@@ -1,59 +1,54 @@
-# 🛒 CompraZap - Manifesto do Projeto v18.0
+# 🛒 CompraZap - Manifesto do Projeto v19.0
 
 ## 📌 Visão Geral
-Plataforma de micro-vendas para condomínios. Foco em UX mobile-first, automação via Telegram e agora com foco total em **redução de fricção no checkout** através de links inteligentes e auto-login.
+Plataforma de micro-vendas para condomínios. Foco em UX mobile-first, automação via Telegram e **vitrine dinâmica de alta conversão** para produtos artesanais (Cucas).
 
 ---
 
 ## 🏗️ Arquitetura Técnica
-- **Frontend:** Next.js 16.2.1 (App Router) - Tailwind / Inline CSS.
-- **Backend:** Supabase (PostgreSQL + Auth).
-- **Interatividade:** Telegram Bot API (@8625189600).
-- **Auto-Login:** Uso de SearchParams (`?w=phone`) com wrapper `<Suspense>` para identificação automática de clientes via link do WhatsApp.
+- **Frontend:** Next.js 16.2.1 (App Router).
+- **Backend:** Supabase (Auth + Storage + DB).
+- **UX Dinâmica:** Marquee CSS para carrossel infinito e fallback inteligente de imagens de capa.
+- **Auto-Login:** Bypass via `?w=phone` com wrapper `<Suspense>`.
 
 ---
 
 ## 📂 Estrutura de Dados (Atualizada)
 | Tabela | Campo / Status | Descrição |
 | :--- | :--- | :--- |
-| **orders** | `observations` (TEXT) | Notas especiais (ex: "ponto da carne", "portaria"). |
-| **orders** | `status` (Enum) | Estados: `pending`, `paid`, `rejected`, `cancelled`. |
-| **campaigns**| `expires_at` | Lógica de encerramento automático implementada. |
+| **campaigns** | `image_url` | Imagem de capa (Header). |
+| **campaigns** | `image_gallery` | Array JSONB com até 5 fotos para o carrossel. |
+| **orders** | `status` | `pending`, `paid`, `rejected`, `cancelled`. |
 
 ---
 
-## ✅ Fluxo de UX Implementado (v18.0)
+## ✅ Fluxo de UX Implementado (v19.0)
 
 ### 1. Experiência do Comprador (`/c/[id]`)
-- **Link Inteligente:** O link enviado pelo vendedor já carrega o telefone do cliente. O app identifica o parâmetro `?w=`, mascara o número e faz o login automático.
-- **Identificação Persistente:** Badge verde no topo com Nome, Apto e Tel. Opção **"Alterar"** para trocar de usuário.
-- **Histórico Rápido:** Link direto no topo para ver "Pedidos anteriores desta campanha" (abre uma lista retrátil).
-- **Vitrine Dinâmica:** Preços em destaque (Verde Emerald, Negrito) e campo de observações integrado à lista.
-- **Conferência:** Resumo detalhado dos itens aparece na tela de dados e na tela final do Pix.
+- **Vitrine Automática:** Carrossel de fotos do produto desliza sozinho (Marquee) para chamar atenção.
+- **Fallback Inteligente:** Se o vendedor não subir uma capa, o app usa a primeira foto da galeria como header.
+- **Texto Formatado:** Descrições preservam quebras de linha (`pre-wrap`) para listas de preços.
+- **Check-out de Segurança:** Persistência de carrinho via `localStorage` e resumo visual antes do PIX.
 
-### 2. Gestão do Vendedor (`/campanha/gestao/[id]`)
-- **Dashboard de Atividade:** Métricas de Views, Pedidos Reais (exclui cancelados) e Pagamentos Confirmados.
-- **Status Visual:** Pedidos cancelados aparecem com opacidade reduzida e etiqueta cinza.
-- **Ações Rápidas:** Botões para Aprovar Pix ou Rejeitar Comprovante.
-- **WhatsApp Dinâmico:** Botão que gera mensagens personalizadas baseadas no status (Cobrança de Pix, Erro no Comprovante, Sucesso ou Recuperação de Cancelados) incluindo o Link Inteligente.
+### 2. Painel do Morador (`/`)
+- **Gestão de Campanhas:** Lista completa com métricas reais e selos de alerta de PIX.
+- **Edição em Tempo Real:** Botão **"EDITAR ✏️"** que carrega dados existentes para ajustes rápidos sem mudar o link.
+- **Social Condomínio:** Seção "Minhas Compras" para acompanhar pedidos feitos a outros vizinhos.
 
 ---
 
-## 🛠️ Log de Batalhas & Soluções (Últimas 24h)
-- **Bug de Build (white):** Corrigido erro de sintaxe onde a cor "white" estava sem aspas no objeto de estilo.
-- **Auto-login Fixo:** Implementado `useEffect` monitorando o estado da `campaign` para garantir que o login automático só dispare após o carregamento dos dados do banco.
-- **Sincronia Telegram:** Restabelecidas as notificações de "Novo Pedido" e "Comprovante Enviado" após refatoração de layout.
+## 🛠️ Log de Batalhas & Soluções (Últimas Evoluções)
+- **Bug de Looping:** Implementado efeito Marquee CSS puro para evitar dependências de bibliotecas de terceiros no mobile.
+- **Recuperação de Edição:** Ajustada a lógica de `upsert` na criação de ofertas para diferenciar `insert` de `update` baseado no ID da URL.
 
 ---
 
-## 🚀 Próximos Passos (Backlog)
-- [ ] **Persistência Local:** Garantir que o `LocalStorage` não limpe itens se o usuário der refresh na tela de dados.
-- [ ] **Edição de Campanhas:** Permitir que o vendedor altere título/descrição de uma oferta ativa.
-- [ ] **Múltiplos Condomínios:** Criar o seletor de localização no cadastro do perfil.
+## 🚀 Próximos Passos
+- [ ] **Filtro por Condomínio:** Preparar o cadastro para multi-condomínios.
+- [ ] **Persistência Local Total:** Garantir que dados de identificação (nome/apto) não sumam no refresh.
 
 ---
 
 ## 🔗 Links e Credenciais
 - **Bot Telegram:** `@8625189600` (CompraZap Alertas)
-- **SQL de Update:** `ALTER TABLE orders ADD COLUMN observations TEXT;`
-- **Exemplo Link Inteligente:** `.../c/ID_DA_CAMPANHA?w=5511999998888`
+- **Bucket Storage:** `comprovantes` (usado para recibos e fotos de produtos).
