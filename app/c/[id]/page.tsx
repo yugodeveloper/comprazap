@@ -97,7 +97,7 @@ function LandingContent() {
   }, [itemsList, id]);
 
   const handleLogout = () => {
-    if(!confirm("Deseja fazer outro pedido?")) return;
+    if(!confirm("Deseja alterar o usuário ou fazer outro pedido?")) return;
     localStorage.removeItem(`cart_${id}`);
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
@@ -124,15 +124,27 @@ function LandingContent() {
     setLoading(true);
     try {
       const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
+      
       if (orders && orders.length > 0) {
-        const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
-        if (pending) {
-          setExistingOrder(pending); setOrderStatus(pending.status); setObservations(pending.observations || '');
-          setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
-          setItemsList(pending.selected_variations || []); setStep('concluido');
-          setLoading(false); return;
+        // CORREÇÃO: Recupera os dados do comprador para preencher os campos automaticamente
+        const lastOrder = orders[0];
+        setBuyerName(lastOrder.buyer_name || '');
+        setBuyerApto(lastOrder.buyer_apto || '');
+        setPastOrders(orders.filter((o: any) => o.status === 'paid'));
+
+        const activeOrder = orders.find((o: any) => o.status !== 'cancelled');
+        
+        if (activeOrder) {
+          setExistingOrder(activeOrder); 
+          setOrderStatus(activeOrder.status); 
+          setObservations(activeOrder.observations || '');
+          setItemsList(activeOrder.selected_variations || []); 
+          setStep('concluido'); // Se houver pedido ativo, vai direto para o checkout
+          setLoading(false); 
+          return;
         }
       }
+      // Se não tem pedido ativo, vai para a escolha de itens, mas com o nome já preenchido se ele existir
       setStep('itens');
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -167,7 +179,6 @@ function LandingContent() {
       
       let finalVariations = [];
       if (pd) {
-          // LÓGICA CORRIGIDA: Ignora price/name de 1º nível e foca na variations (JSONB)
           if (Array.isArray(pd.variations)) finalVariations = pd.variations;
           else if (typeof pd.variations === 'string') {
               try { finalVariations = JSON.parse(pd.variations); } catch(e) { finalVariations = []; }
@@ -360,7 +371,6 @@ function LandingContent() {
                 {orderStatus === 'paid' ? '✅ Pagamento Aprovado!' : orderStatus === 'rejected' ? '❌ Comprovante Recusado' : 'Aguardando Pagamento'}
               </div>
 
-              {/* ITEM 8: Oculta QR Code se já estiver pago */}
               {orderStatus !== 'paid' && (
                 <>
                   <QRCodeSVG value={campaign?.pix_key || ''} size={150} />
@@ -383,7 +393,6 @@ function LandingContent() {
                   </div>
               </div>
 
-              {/* ITEM 9: Design do Comprovante Melhorado */}
               <div style={{ marginTop: 20, padding: 15, backgroundColor: '#f8fafc', borderRadius: 20, border: '2px dashed #e2e8f0' }}>
                 <p style={{ fontSize: 11, fontWeight: 900, color: '#64748b', marginBottom: 10 }}>COMPROVANTE PIX</p>
                 {existingOrder?.receipt_url ? (
@@ -399,7 +408,6 @@ function LandingContent() {
                 )}
               </div>
 
-              {/* ITEM 4: Reiniciar Pedido */}
               {orderStatus === 'paid' && (
                 <button onClick={handleLogout} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
               )}
