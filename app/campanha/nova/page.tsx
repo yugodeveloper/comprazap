@@ -21,6 +21,9 @@ function NovaCampanhaContent() {
   const [gallery, setGallery] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
+  
+  // ESTADO DE DEBUG: Para ver o que o banco está cuspindo
+  const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
@@ -36,6 +39,7 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
+          setDebugData(camp.products); // Debug visual aqui
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -47,14 +51,11 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // --- BLINDAGEM MÁXIMA NA CARGA DE VARIAÇÕES ---
           if (camp.products && Array.isArray(camp.products) && camp.products.length > 0) {
             const prod = camp.products[0];
             let rawVars = prod.variations;
             
             let finalArray = [];
-            
-            // Garantimos que rawVars vire um Array, não importa como venha do banco
             if (typeof rawVars === 'string') {
               try { finalArray = JSON.parse(rawVars); } catch(e) { finalArray = []; }
             } else if (Array.isArray(rawVars)) {
@@ -62,14 +63,10 @@ function NovaCampanhaContent() {
             }
 
             if (finalArray.length > 0) {
-              // Mapeamos forçando string no price para não quebrar o input
-              const mapped = finalArray.map((v: any) => ({
+              setVariations(finalArray.map((v: any) => ({
                 name: String(v.name || ''),
                 price: String(v.price || '')
-              }));
-              
-              setVariations(mapped);
-              console.log("Variations sincronizadas no formulário:", mapped);
+              })));
             }
           }
         }
@@ -112,8 +109,6 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Sessão expirada.");
-
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -125,11 +120,9 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
-        if (campErr) throw campErr;
+        await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
-        const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
-        if (campErr) throw campErr;
+        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
         campId = camp.id;
       }
 
@@ -140,7 +133,6 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // --- UPSERT BLINDADO ---
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({
@@ -153,7 +145,6 @@ function NovaCampanhaContent() {
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
-      console.error("Erro no submit:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -165,6 +156,15 @@ function NovaCampanhaContent() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+        
+        {/* BLOCO DE DEBUG VISUAL - APENAS PARA TESTE */}
+        {editId && (
+          <div style={{ fontSize: '10px', background: '#333', color: '#0f0', padding: '10px', borderRadius: '10px', overflowX: 'auto' }}>
+            <strong>DEBUG - DADOS DOS PRODUTOS NO BANCO:</strong>
+            <pre>{JSON.stringify(debugData, null, 2)}</pre>
+          </div>
+        )}
+
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
