@@ -63,7 +63,6 @@ export default function PortalCondominio() {
 
   const fetchUserActivity = async (userPhone: string, userId: string) => {
     try {
-      // 1. Campanhas Criadas (Gestão)
       const { data: campaigns } = await supabase
         .from('campaigns')
         .select('*, orders(status, receipt_url)')
@@ -72,7 +71,6 @@ export default function PortalCondominio() {
 
       setMyCampaigns(campaigns || []);
 
-      // 2. Compras Feitas (Histórico como Comprador)
       const { data: purchases } = await supabase
         .from('orders')
         .select('*, campaigns(title, profiles(full_name))')
@@ -89,8 +87,13 @@ export default function PortalCondominio() {
   const handleShare = (camp: any) => {
     const url = `${window.location.origin}/c/${camp.id}`;
     const texto = `🛍️ *NOVIDADE NO LANAI!*\n\n*${camp.title}*\n\nConfira os detalhes e faça sua reserva pelo link abaixo:\n👉 ${url}`;
-    navigator.clipboard.writeText(texto);
-    alert("Link copiado! ✅");
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(texto).then(() => {
+        alert("Link copiado! ✅ Envie agora no seu grupo do WhatsApp.");
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, '_blank');
+      });
+    }
   };
 
   const handleEndCampaign = async (campId: string) => {
@@ -101,7 +104,9 @@ export default function PortalCondominio() {
     setLoading(true);
     const { error } = await supabase.from('campaigns').update({ expires_at: expiresAt, status: 'expired' }).eq('id', campId);
     if (error) alert("Erro: " + error.message);
-    else setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'expired' } : c));
+    else {
+      setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'expired' } : c));
+    }
     setLoading(false);
   };
 
@@ -110,7 +115,9 @@ export default function PortalCondominio() {
     setLoading(true);
     const { error } = await supabase.from('campaigns').update({ expires_at: expiresAt, status: 'active' }).eq('id', campId);
     if (error) alert("Erro: " + error.message);
-    else setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
+    else {
+      setMyCampaigns(myCampaigns.map(c => c.id === campId ? { ...c, expires_at: expiresAt, status: 'active' } : c));
+    }
     setLoading(false);
   };
 
@@ -160,15 +167,7 @@ export default function PortalCondominio() {
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
 
-  if (configError) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', color: 'red', fontFamily: 'sans-serif' }}>
-        <h1 style={{fontWeight: 900}}>ERRO DE SISTEMA</h1>
-        <p>{configError}</p>
-        <p style={{color: '#666', fontSize: 10}}>Verifique Environment Variables na Vercel.</p>
-      </div>
-    )
-  }
+  if (configError) return <div style={{ padding: 40, textAlign: 'center', color: 'red' }}><h1>ERRO DE CONFIGURAÇÃO</h1><p>{configError}</p></div>
 
   if (!isLoggedIn) { 
       return (
@@ -213,7 +212,6 @@ export default function PortalCondominio() {
           <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '8px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
         </header>
 
-        {/* SEÇÃO 1: MINHAS VENDAS (GESTÃO) */}
         <section style={{marginBottom: '30px'}}>
           <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS OFERTAS</h3>
           <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
@@ -235,7 +233,7 @@ export default function PortalCondominio() {
                         {pendingAproval > 0 && <span style={{backgroundColor: '#f59e0b', color: 'white', fontSize: '6px', padding: '2px 4px', borderRadius: '4px', fontWeight: 900}}>🔔 {pendingAproval} AGUARDANDO PIX</span>}
                       </div>
                     </div>
-                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#f5f5f4', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>📢</button>
+                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#059669', color: 'white', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 900, fontSize: '10px' }}>DIVULGAR 📢</button>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '6px 0', borderTop: '1px solid #fafafa', borderBottom: '1px solid #fafafa', textAlign: 'center' }}>
@@ -244,12 +242,9 @@ export default function PortalCondominio() {
                     <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PAGOS</p></div>
                   </div>
 
-                  {/* AJUSTE: BOTÕES DE AÇÃO COM EDITAR */}
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR VENDAS</button>
-                    
                     <button onClick={() => router.push(`/campanha/nova?id=${camp.id}`)} style={{ flex: 1, border: '1px solid #ddd', backgroundColor: 'white', color: '#444', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>EDITAR ✏️</button>
-                    
                     {isExpired ? (
                       <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
                     ) : (
@@ -262,7 +257,6 @@ export default function PortalCondominio() {
           </div>
         </section>
 
-        {/* SEÇÃO 2: MINHAS COMPRAS (HISTÓRICO) */}
         {myPurchases.length > 0 && (
           <section style={{marginBottom: '30px'}}>
              <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS COMPRAS COM VIZINHOS</h3>
@@ -284,10 +278,6 @@ export default function PortalCondominio() {
              </div>
           </section>
         )}
-
-        <footer style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '20px' }}>
-          <p style={{ fontSize: '7px', fontWeight: '900', color: '#d6d3d1', letterSpacing: '3px' }}>COMPRAZAP⚡LANAI</p>
-        </footer>
       </div>
     </div>
   )

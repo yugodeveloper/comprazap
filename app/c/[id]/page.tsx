@@ -5,34 +5,6 @@ import { useEffect, useState, Suspense, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 
-function SetMetaTags({ title, description, image }: { title: string, description: string, image: string }) {
-  useEffect(() => {
-    if (!title || title === 'CompraZap⚡') return;
-    document.title = title;
-    
-    const updateTag = (name: string, content: string, property = false) => {
-      const attr = property ? 'property' : 'name';
-      let el = document.querySelector(`meta[${attr}="${name}"]`);
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute(attr, name);
-        document.head.appendChild(el);
-      }
-      el.setAttribute('content', content);
-    };
-
-    updateTag('description', description);
-    updateTag('og:title', title, true);
-    updateTag('og:description', description, true);
-    updateTag('og:image', image, true);
-    updateTag('og:image:width', '800', true);
-    updateTag('og:image:height', '1000', true);
-    updateTag('og:type', 'website', true);
-    updateTag('twitter:card', 'summary_large_image');
-  }, [title, description, image]);
-  return null;
-}
-
 function LandingContent() {
   const params = useParams()
   const searchParams = useSearchParams()
@@ -269,12 +241,6 @@ function LandingContent() {
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
-      <SetMetaTags 
-        title={campaign?.title || 'CompraZap⚡'} 
-        description={campaign?.description || 'Faça seu pedido direto pelo WhatsApp!'} 
-        image={campaign?.share_image || headerImage || ''} 
-      />
-
       <div style={containerStyle}>
         
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
