@@ -31,7 +31,6 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  // ESTADOS DO NOVO CARROSSEL
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -46,36 +45,31 @@ function LandingContent() {
     }
   };
 
-  // LÓGICA DE SCROLL AUTOMÁTICO LENTO (RESGATADA)
+  // NOVA LÓGICA: AUTOPLAY POR SLIDE (Não interfere na inércia do dedo)
   useEffect(() => {
-    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1) return;
+    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1 || isPaused) return;
 
-    let animationFrame: number;
-    const scrollContainer = scrollRef.current;
-
-    const animate = () => {
-      if (scrollContainer && !isPaused) {
-        scrollContainer.scrollLeft += 0.6; // Velocidade lenta e constante
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
+        const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 10;
         
-        // Loop infinito suave
-        if (scrollContainer.scrollLeft >= (scrollContainer.scrollWidth / 2)) {
-          scrollContainer.scrollLeft = 0;
-        }
+        scrollRef.current.scrollTo({
+          left: isAtEnd ? 0 : scrollLeft + clientWidth,
+          behavior: 'smooth'
+        });
       }
-      animationFrame = requestAnimationFrame(animate);
-    };
+    }, 5000); // Avança a cada 5 segundos
 
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
+    return () => clearInterval(interval);
   }, [campaign, isPaused]);
 
-  // Funções de navegação por setas
   const navScroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
       const width = scrollRef.current.clientWidth;
       scrollRef.current.scrollBy({ left: direction === 'right' ? width : -width, behavior: 'smooth' });
-      setIsPaused(true); // Pausa o auto-scroll ao interagir explicitamente
-      setTimeout(() => setIsPaused(false), 5000); // Retoma após 5 seg
+      setIsPaused(true);
+      setTimeout(() => setIsPaused(false), 8000);
     }
   };
 
@@ -243,7 +237,7 @@ function LandingContent() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* HEADER */}
+        {/* CAPA */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -251,6 +245,7 @@ function LandingContent() {
           </div>
         </div>
 
+        {/* INFO BADGES */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -259,29 +254,26 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL HÍBRIDO (IPHONE + DESKTOP + AUTO-SCROLL LENTO) */}
+          {/* CARROSSEL PROFISSIONAL (IPHONE + ANDROID) */}
           {campaign?.image_gallery?.length > 0 && (
-            <div 
-              style={{ marginBottom: 25, position: 'relative' }}
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
-            >
+            <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
                 ref={scrollRef}
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
                 style={{ 
                     display: 'flex', 
                     overflowX: 'auto', 
                     scrollSnapType: 'x mandatory', 
-                    WebkitOverflowScrolling: 'touch', // Inércia iPhone
+                    WebkitOverflowScrolling: 'touch', // Habilita inércia no iPhone
                     scrollbarWidth: 'none',
                     borderRadius: '25px',
-                    gap: 0, // Remove espaços brancos no iPhone
+                    gap: 0, 
                 }}
               >
-                {/* Duplicamos a lista para o auto-scroll infinito não dar pulo */}
-                {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
+                {campaign.image_gallery.map((img: string, i: number) => (
                   <div key={i} style={{ 
                       minWidth: '100%', 
                       width: '100%',
@@ -298,23 +290,17 @@ function LandingContent() {
                 ))}
               </div>
 
-              {/* SETAS DESKTOP (DISCRETAS) */}
-              <button 
-                onClick={() => navScroll('left')}
-                style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.7)', border: 'none', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: 16, zIndex: 10 }}
-              >‹</button>
-              <button 
-                onClick={() => navScroll('right')}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.7)', border: 'none', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: 16, zIndex: 10 }}
-              >›</button>
+              {/* SETAS DISCRETAS (Otimizado para Desktop) */}
+              <button onClick={() => navScroll('left')} style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>‹</button>
+              <button onClick={() => navScroll('right')} style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>›</button>
 
-              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>
-                ➔ Deslize para ver detalhes
+              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 15, textTransform: 'uppercase' }}>
+                ➔ Deslize para o lado
               </p>
             </div>
           )}
 
-          {/* DESCRIÇÃO PRE-WRAP */}
+          {/* DESCRIÇÃO */}
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
               {campaign?.description}
@@ -355,7 +341,7 @@ function LandingContent() {
                         {pastOrders.map((order: any) => (
                           <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
                               <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
                             </div>
                           </div>
