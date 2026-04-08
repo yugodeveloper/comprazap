@@ -91,10 +91,12 @@ function LandingContent() {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
     
-    // Tenta recuperar telefone da sessão para não pedir de novo
+    // Recupera telefone da sessão
     const sessionPhone = localStorage.getItem('comprazap_session_phone');
     if (sessionPhone && !contact && !autoPhone) {
-      setContact(maskPhone(sessionPhone));
+      const masked = maskPhone(sessionPhone);
+      setContact(masked);
+      identificarUsuario(masked);
     }
   }, [id]);
 
@@ -103,7 +105,7 @@ function LandingContent() {
   }, [itemsList, id]);
 
   const handleLogout = () => {
-    if(!confirm("Deseja usar outro número de WhatsApp?")) return;
+    if(!confirm("Deseja alterar o usuário?")) return;
     localStorage.removeItem(`cart_${id}`);
     localStorage.removeItem('comprazap_session_phone');
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
@@ -114,7 +116,7 @@ function LandingContent() {
     if(!confirm("Iniciar uma nova compra?")) return;
     localStorage.removeItem(`cart_${id}`);
     setItemsList([]); setExistingOrder(null); setObservations('');
-    setStep('itens'); // Volta para os itens sem pedir telefone
+    setStep('itens'); 
   };
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
@@ -145,7 +147,6 @@ function LandingContent() {
         setBuyerApto(orders[0].buyer_apto || '');
         setPastOrders(orders.filter((o: any) => o.status === 'paid'));
 
-        // Se houver um pedido pendente OU pago nesta campanha, mostra a tela final
         const activeOrder = orders.find((o: any) => o.status !== 'cancelled');
         
         if (activeOrder) {
@@ -285,10 +286,6 @@ function LandingContent() {
             <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
                 ref={scrollRef} onScroll={handleScroll}
-                onTouchStart={() => setIsPaused(true)}
-                onTouchEnd={() => setIsPaused(false)}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
                 style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', borderRadius: '25px', gap: 0 }}
               >
                 {loopItems.map((img: string, i: number) => (
@@ -314,7 +311,7 @@ function LandingContent() {
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
-              <button onClick={handleLogout} style={{ fontSize: 9, fontWeight: 900, color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 12px', borderRadius: 50, cursor:'pointer' }}>ALTERAR NÚMERO</button>
+              {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
           </div>
 
           {step === 'identificacao' && (
@@ -322,6 +319,38 @@ function LandingContent() {
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={() => identificarUsuario(contact)} style={btnStyle}>ACESSAR OFERTA</button>
+            </div>
+          )}
+
+          {/* RECUPERADO: Badge Verde de Identificação com Histórico */}
+          {step !== 'identificacao' && (
+            <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{fontSize: '11px'}}>
+                      <p style={{margin: 0, fontWeight: 900}}>{buyerName || 'Vizinho'}</p>
+                      <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
+                      <p style={{margin: '2px 0 0 0', fontWeight: 900, fontSize: '10px'}}>{contact}</p>
+                  </div>
+                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
+               </div>
+               
+               {pastOrders.length > 0 && (
+                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', marginTop: 10, paddingTop: 10 }}>
+                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
+                    {showHistory && (
+                      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {pastOrders.map((order: any) => (
+                          <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                              <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                 </div>
+               )}
             </div>
           )}
 
