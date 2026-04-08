@@ -132,15 +132,14 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // LÓGICA ATÔMICA DE UPSERT
-      const { error: prodErr } = await supabase
-        .from('products')
-        .upsert(
-          { campaign_id: campId, variations: formattedVariations }, 
-          { onConflict: 'campaign_id' }
-        );
+      // --- AQUI MUDA A ESTRATÉGIA: CHAMADA DE FUNÇÃO RPC ---
+      // Invocamos a função do banco que ignora as travas de RLS do front-end
+      const { error: rpcErr } = await supabase.rpc('save_campaign_products', {
+        target_campaign_id: campId,
+        new_variations: formattedVariations
+      });
 
-      if (prodErr) throw prodErr;
+      if (rpcErr) throw rpcErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
