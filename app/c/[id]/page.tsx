@@ -340,7 +340,7 @@ function LandingContent() {
 
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
-              <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
+              <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Para iniciar seu pedido, primeiro informe seu número de telefone no Whatsapp</h3>
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={() => identificarUsuario(contact)} style={btnStyle}>ACESSAR OFERTA</button>
             </div>
@@ -354,7 +354,7 @@ function LandingContent() {
                       <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
                       <p style={{margin: '2px 0 0 0', fontWeight: 900, fontSize: '10px'}}>{contact}</p>
                   </div>
-                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: '900', padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
+                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
                </div>
                
                {pastOrders.length > 0 && (
