@@ -84,16 +84,14 @@ export default function PortalCondominio() {
     }
   }
 
-  // NOVA FUNÇÃO DE COMPARTILHAMENTO (DIRETO WHATSAPP)
   const handleShare = (camp: any) => {
     const url = `${window.location.origin}/c/${camp.id}`;
     
-    // Copywriter estratégico:
+    // Copy formatada conforme solicitado
     const texto = encodeURIComponent(
-      `🥧 *NOVIDADE NO LANAI!* ⚡\n\n` +
-      `*${camp.title.toUpperCase()}*\n` +
-      `${camp.description.substring(0, 100)}...\n\n` +
-      `👇 *VEJA AS FOTOS E RESERVE AQUI:* \n` +
+      `🥧 *${camp.title.toUpperCase()}*\n\n` +
+      `${camp.description}\n\n` +
+      `👇 *FAÇA SEU PEDIDO:* \n` +
       `${url}`
     );
 
@@ -242,7 +240,6 @@ export default function PortalCondominio() {
                         {pendingAproval > 0 && <span style={{backgroundColor: '#f59e0b', color: 'white', fontSize: '6px', padding: '2px 4px', borderRadius: '4px', fontWeight: 900}}>🔔 {pendingAproval} AGUARDANDO PIX</span>}
                       </div>
                     </div>
-                    {/* BOTÃO COMPARTILHAR ATUALIZADO */}
                     <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#059669', color: 'white', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 900, fontSize: '10px' }}>DIVULGAR 📢</button>
                   </div>
 

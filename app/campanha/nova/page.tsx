@@ -17,7 +17,7 @@ function NovaCampanhaContent() {
   const [maxSales, setMaxSales] = useState('50')
   
   const [headerImg, setHeaderImg] = useState('')
-  const [shareImg, setShareImg] = useState('') // Nova Foto de Divulgação
+  const [shareImg, setShareImg] = useState('') 
   const [gallery, setGallery] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
@@ -29,23 +29,38 @@ function NovaCampanhaContent() {
   useEffect(() => {
     if (editId) {
       const loadEditData = async () => {
-        const { data: camp } = await supabase.from('campaigns').select('*, products(*)').eq('id', editId).single();
-        if (camp) {
+        // Busca campanha e produtos vinculados
+        const { data: camp, error } = await supabase
+          .from('campaigns')
+          .select('*, products(*)')
+          .eq('id', editId)
+          .single();
+
+        if (camp && !error) {
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
+          
           if (camp.expires_at) {
             const date = new Date(camp.expires_at);
             setExpiresAt(date.toLocaleDateString('pt-BR'));
           }
+          
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
-          setShareImg(camp.share_image || ''); // Carrega foto share
+          setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
+          
+          // CARREGAMENTO DAS VARIAÇÕES (CORREÇÃO)
           if (camp.products && camp.products.length > 0) {
-            const vars = camp.products[0].variations;
-            if (Array.isArray(vars)) {
-              setVariations(vars.map((v: any) => ({ name: v.name, price: v.price.toString() })));
+            const prod = camp.products[0];
+            if (prod.variations && Array.isArray(prod.variations)) {
+              setVariations(prod.variations.map((v: any) => ({
+                name: v.name,
+                price: v.price.toString()
+              })));
+            } else {
+              setVariations([{ name: prod.name, price: prod.price.toString() }]);
             }
           }
         }
@@ -95,7 +110,7 @@ function NovaCampanhaContent() {
         expires_at: isoDate,
         max_sales: parseInt(maxSales), 
         image_url: headerImg || null,
-        share_image: shareImg || null, // Salva foto share
+        share_image: shareImg || null,
         image_gallery: gallery, 
         creator_id: userId, 
         status: 'active'
@@ -115,12 +130,15 @@ function NovaCampanhaContent() {
         name: v.name, price: parseFloat(v.price.replace(',', '.'))
       }))
 
-      await supabase.from('products').upsert({ 
+      // SALVAMENTO DOS PRODUTOS (CORREÇÃO PARA PERSISTIR NA EDIÇÃO)
+      const { error: prodErr } = await supabase.from('products').upsert({ 
         campaign_id: campId, 
         name: title, 
         price: formattedVariations[0].price, 
         variations: formattedVariations 
       }, { onConflict: 'campaign_id' });
+
+      if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/'; 
@@ -144,10 +162,9 @@ function NovaCampanhaContent() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           <div style={{ display: 'flex', gap: '15px' }}>
-            {/* CAPA TRADICIONAL */}
-            <div style={{ flex: 2 }}>
+            <div style={{ flex: 1.5 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
-              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
+              <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
                 {headerImg ? (
                   <>
                     <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -162,19 +179,19 @@ function NovaCampanhaContent() {
               </div>
             </div>
 
-            {/* FOTO POLAROID (DIVULGAÇÃO) */}
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Foto WhatsApp</label>
-              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
+              <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
                 {shareImg ? (
                   <>
                     <img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     <button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
                   </>
                 ) : (
-                  <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
+                  <label style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} disabled={uploading} />
-                    <span style={{ fontSize: '9px', color: '#059669', fontWeight: 'bold' }}>Polaroid 📸</span>
+                    <span style={{ fontSize: '18px' }}>📸</span>
+                    <span style={{ fontSize: '8px', color: '#059669', fontWeight: 'bold' }}>POLAROID</span>
                   </label>
                 )}
               </div>
