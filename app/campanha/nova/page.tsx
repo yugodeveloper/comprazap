@@ -29,7 +29,6 @@ function NovaCampanhaContent() {
   useEffect(() => {
     if (editId) {
       const loadEditData = async () => {
-        // Busca campanha e produtos vinculados
         const { data: camp, error } = await supabase
           .from('campaigns')
           .select('*, products(*)')
@@ -40,18 +39,15 @@ function NovaCampanhaContent() {
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
-          
           if (camp.expires_at) {
             const date = new Date(camp.expires_at);
             setExpiresAt(date.toLocaleDateString('pt-BR'));
           }
-          
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // CARREGAMENTO DAS VARIAÇÕES (CORREÇÃO)
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
             if (prod.variations && Array.isArray(prod.variations)) {
@@ -127,10 +123,10 @@ function NovaCampanhaContent() {
       }
 
       const formattedVariations = variations.map(v => ({
-        name: v.name, price: parseFloat(v.price.replace(',', '.'))
+        name: v.name, price: parseFloat(v.price.toString().replace(',', '.'))
       }))
 
-      // SALVAMENTO DOS PRODUTOS (CORREÇÃO PARA PERSISTIR NA EDIÇÃO)
+      // SALVAMENTO ROBUSTO DOS PRODUTOS
       const { error: prodErr } = await supabase.from('products').upsert({ 
         campaign_id: campId, 
         name: title, 
@@ -172,7 +168,7 @@ function NovaCampanhaContent() {
                   </>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                    <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} disabled={uploading} />
+                    <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} />
                     <span style={{ fontSize: '10px', color: '#94a3b8' }}>+ Capa</span>
                   </label>
                 )}
@@ -189,7 +185,7 @@ function NovaCampanhaContent() {
                   </>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
-                    <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} disabled={uploading} />
+                    <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} />
                     <span style={{ fontSize: '18px' }}>📸</span>
                     <span style={{ fontSize: '8px', color: '#059669', fontWeight: 'bold' }}>POLAROID</span>
                   </label>
@@ -209,7 +205,7 @@ function NovaCampanhaContent() {
                 ))}
                 {gallery.length < 5 && (
                   <label style={{ width: '80px', height: '110px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor: 'white' }}>
-                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, 'gallery')} disabled={uploading} />
+                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, 'gallery')} />
                     <span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
                   </label>
                 )}
@@ -243,7 +239,7 @@ function NovaCampanhaContent() {
           </div>
           <input placeholder="Sua Chave Pix" required style={inputStyle} value={pixKey} onChange={e => setPixKey(e.target.value)} />
 
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
+          <button type="submit" disabled={loading || uploading} style={{ width: '100%', padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>
             {loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}
           </button>
         </form>

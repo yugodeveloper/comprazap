@@ -5,10 +5,9 @@ import { useEffect, useState, Suspense, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 
-// Sub-componente para injetar Meta Tags no Navegador/WhatsApp
 function SetMetaTags({ title, description, image }: { title: string, description: string, image: string }) {
   useEffect(() => {
-    if (!title) return;
+    if (!title || title === 'CompraZap⚡') return;
     document.title = title;
     
     const updateTag = (name: string, content: string, property = false) => {
@@ -26,6 +25,8 @@ function SetMetaTags({ title, description, image }: { title: string, description
     updateTag('og:title', title, true);
     updateTag('og:description', description, true);
     updateTag('og:image', image, true);
+    updateTag('og:image:width', '800', true);
+    updateTag('og:image:height', '1000', true);
     updateTag('og:type', 'website', true);
     updateTag('twitter:card', 'summary_large_image');
   }, [title, description, image]);
@@ -268,7 +269,6 @@ function LandingContent() {
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
-      {/* INJETOR DE META TAGS DINÂMICAS PARA O WHATSAPP */}
       <SetMetaTags 
         title={campaign?.title || 'CompraZap⚡'} 
         description={campaign?.description || 'Faça seu pedido direto pelo WhatsApp!'} 
