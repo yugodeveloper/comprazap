@@ -31,12 +31,9 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  // Referências para o Carrossel Nativo
+  // ESTADOS DO NOVO CARROSSEL
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeftState, setScrollLeftState] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
@@ -49,25 +46,38 @@ function LandingContent() {
     }
   };
 
-  // Lógica de Auto-play (Avança um slide por vez)
+  // LÓGICA DE SCROLL AUTOMÁTICO LENTO (RESGATADA)
   useEffect(() => {
-    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1 || !isAutoScrolling) return;
+    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1) return;
 
-    const interval = setInterval(() => {
-      if (scrollRef.current) {
-        const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
-        const maxScroll = scrollWidth - clientWidth;
+    let animationFrame: number;
+    const scrollContainer = scrollRef.current;
+
+    const animate = () => {
+      if (scrollContainer && !isPaused) {
+        scrollContainer.scrollLeft += 0.6; // Velocidade lenta e constante
         
-        if (scrollLeft >= maxScroll - 10) {
-          scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-        } else {
-          scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
+        // Loop infinito suave
+        if (scrollContainer.scrollLeft >= (scrollContainer.scrollWidth / 2)) {
+          scrollContainer.scrollLeft = 0;
         }
       }
-    }, 4000);
+      animationFrame = requestAnimationFrame(animate);
+    };
 
-    return () => clearInterval(interval);
-  }, [campaign, isAutoScrolling]);
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [campaign, isPaused]);
+
+  // Funções de navegação por setas
+  const navScroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const width = scrollRef.current.clientWidth;
+      scrollRef.current.scrollBy({ left: direction === 'right' ? width : -width, behavior: 'smooth' });
+      setIsPaused(true); // Pausa o auto-scroll ao interagir explicitamente
+      setTimeout(() => setIsPaused(false), 5000); // Retoma após 5 seg
+    }
+  };
 
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
@@ -214,23 +224,6 @@ function LandingContent() {
     setUploading(false);
   };
 
-  // Funções de Arrastar Mouse (Desktop)
-  const onMouseDown = (e: React.MouseEvent) => {
-    setIsAutoScrolling(false);
-    setIsDragging(true);
-    setStartX(e.pageX - (scrollRef.current?.offsetLeft || 0));
-    setScrollLeftState(scrollRef.current?.scrollLeft || 0);
-  };
-  const onMouseLeave = () => setIsDragging(false);
-  const onMouseUp = () => setIsDragging(false);
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - (scrollRef.current.offsetLeft || 0);
-    const walk = (x - startX) * 1.5;
-    scrollRef.current.scrollLeft = scrollLeftState - walk;
-  };
-
   const InfoBadge = ({label, value}: {label: string, value: string}) => (
     <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
       <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</p>
@@ -250,7 +243,7 @@ function LandingContent() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* HEADER (Capa) */}
+        {/* HEADER */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -258,7 +251,6 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* DADOS RÁPIDOS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -267,51 +259,57 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL NATIVO (Otimizado para iPhone e Desktop) */}
+          {/* CARROSSEL HÍBRIDO (IPHONE + DESKTOP + AUTO-SCROLL LENTO) */}
           {campaign?.image_gallery?.length > 0 && (
-            <div style={{ marginBottom: 25 }}>
+            <div 
+              style={{ marginBottom: 25, position: 'relative' }}
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
+            >
               <div 
                 ref={scrollRef}
-                onMouseDown={onMouseDown}
-                onMouseLeave={onMouseLeave}
-                onMouseUp={onMouseUp}
-                onMouseMove={onMouseMove}
-                onTouchStart={() => setIsAutoScrolling(false)}
+                onTouchStart={() => setIsPaused(true)}
+                onTouchEnd={() => setIsPaused(false)}
                 style={{ 
                     display: 'flex', 
                     overflowX: 'auto', 
                     scrollSnapType: 'x mandatory', 
-                    WebkitOverflowScrolling: 'touch', // Habilita inércia elástica no iPhone
+                    WebkitOverflowScrolling: 'touch', // Inércia iPhone
                     scrollbarWidth: 'none',
                     borderRadius: '25px',
-                    gap: 0,
-                    cursor: isDragging ? 'grabbing' : 'grab'
+                    gap: 0, // Remove espaços brancos no iPhone
                 }}
               >
-                {campaign.image_gallery.map((img: string, i: number) => (
+                {/* Duplicamos a lista para o auto-scroll infinito não dar pulo */}
+                {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
                   <div key={i} style={{ 
                       minWidth: '100%', 
+                      width: '100%',
                       height: '400px', 
-                      scrollSnapAlign: 'center', 
+                      scrollSnapAlign: 'start', 
                       flexShrink: 0, 
                       backgroundColor: '#fff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                   }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   </div>
                 ))}
               </div>
-              
-              {/* Indicadores Visuais (Bolinhas) */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 15 }}>
-                {campaign.image_gallery.map((_: any, i: number) => (
-                  <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#059669', opacity: 0.2 }}></div>
-                ))}
-              </div>
-              <p style={{ textAlign: 'center', fontSize: '9px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                ➔ Deslize para o lado
+
+              {/* SETAS DESKTOP (DISCRETAS) */}
+              <button 
+                onClick={() => navScroll('left')}
+                style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.7)', border: 'none', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: 16, zIndex: 10 }}
+              >‹</button>
+              <button 
+                onClick={() => navScroll('right')}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'rgba(255,255,255,0.7)', border: 'none', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold', fontSize: 16, zIndex: 10 }}
+              >›</button>
+
+              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>
+                ➔ Deslize para ver detalhes
               </p>
             </div>
           )}
@@ -323,16 +321,14 @@ function LandingContent() {
             </p>
           </div>
 
-          {/* VENDEDOR */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
               {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
           </div>
 
-          {/* FLUXO DE IDENTIFICAÇÃO */}
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
@@ -341,7 +337,6 @@ function LandingContent() {
             </div>
           )}
 
-          {/* BADGE DE USUÁRIO E HISTÓRICO */}
           {step !== 'identificacao' && (
             <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -372,7 +367,6 @@ function LandingContent() {
             </div>
           )}
 
-          {/* SELEÇÃO DE ITENS */}
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
               <div style={{ background: 'white', padding: 15, borderRadius: 20, border: '1px solid #eee' }}>
@@ -402,7 +396,6 @@ function LandingContent() {
             </div>
           )}
 
-          {/* DADOS DE ENTREGA */}
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Pedido</button>
@@ -426,7 +419,6 @@ function LandingContent() {
             </div>
           )}
 
-          {/* TELA DE PAGAMENTO (PIX) */}
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
