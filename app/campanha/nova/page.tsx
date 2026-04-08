@@ -47,9 +47,8 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          const prodData = camp.products;
-          if (prodData) {
-            const prod = Array.isArray(prodData) ? prodData[0] : prodData;
+          if (camp.products) {
+            const prod = Array.isArray(camp.products) ? camp.products[0] : camp.products;
             if (prod && prod.variations) {
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
@@ -118,10 +117,11 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        await supabase.from('campaigns').update(payload).eq('id', editId);
+        const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
+        if (campErr) throw campErr;
       } else {
-        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
-        if (!camp) throw new Error("Erro ao criar campanha.");
+        const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
+        if (campErr || !camp) throw new Error("Erro ao criar campanha.");
         campId = camp.id;
       }
 
@@ -132,16 +132,17 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // --- MUDANÇA DE ESTRATÉGIA: DELETE + INSERT ---
-      // Esta sequência evita o erro de "USING expression" do UPSERT
-      await supabase.from('products').delete().eq('campaign_id', campId);
-      
+      // LÓGICA ATÔMICA: Upsert forçando o conflito no campaign_id
+      // O Supabase resolverá internamente se deleta/insere ou atualiza
       const { error: prodErr } = await supabase
         .from('products')
-        .insert({
-          campaign_id: campId,
-          variations: formattedVariations
-        });
+        .upsert(
+          { 
+            campaign_id: campId, 
+            variations: formattedVariations 
+          }, 
+          { onConflict: 'campaign_id' }
+        );
 
       if (prodErr) throw prodErr;
 
