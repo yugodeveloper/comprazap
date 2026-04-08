@@ -31,9 +31,11 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
+  // ESTADOS DO CARROSSEL INFINITO
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0); // Estado para a bolinha ativa
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isReady, setIsReady] = useState(false);
 
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
@@ -46,33 +48,54 @@ function LandingContent() {
     }
   };
 
-  // Lógica para detectar qual slide está ativo e atualizar a bolinha
+  // 1. Prepara a lista para o Loop (Clone do último no início e do primeiro no fim)
+  const gallery = campaign?.image_gallery || [];
+  const loopItems = gallery.length > 1 ? [gallery[gallery.length - 1], ...gallery, gallery[0]] : gallery;
+
+  // 2. Posiciona o scroll no item real (índice 1) ao carregar
+  useEffect(() => {
+    if (gallery.length > 1 && scrollRef.current && !isReady) {
+      const width = scrollRef.current.clientWidth;
+      scrollRef.current.scrollLeft = width;
+      setIsReady(true);
+    }
+  }, [gallery, isReady]);
+
+  // 3. Lógica de "Salto Invisível" para criar o Loop Infinito
   const handleScroll = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, clientWidth } = scrollRef.current;
-      const index = Math.round(scrollLeft / clientWidth);
-      setActiveIndex(index);
+    if (scrollRef.current && gallery.length > 1) {
+      const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
+      
+      // Se chegou no clone do final (último item da lista estendida)
+      if (scrollLeft <= 0) {
+        scrollRef.current.scrollTo({ left: scrollWidth - (2 * clientWidth) });
+      } 
+      // Se chegou no clone do início (primeiro item da lista estendida)
+      else if (scrollLeft >= scrollWidth - clientWidth) {
+        scrollRef.current.scrollTo({ left: clientWidth });
+      }
+
+      // Atualiza a bolinha ignorando os clones
+      const index = Math.round(scrollLeft / clientWidth) - 1;
+      if (index >= 0 && index < gallery.length) {
+        setActiveIndex(index);
+      }
     }
   };
 
-  // Autoplay por Slide
+  // 4. Autoplay por Slide
   useEffect(() => {
-    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1 || isPaused) return;
+    if (gallery.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
       if (scrollRef.current) {
-        const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
-        const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 10;
-        
-        scrollRef.current.scrollTo({
-          left: isAtEnd ? 0 : scrollLeft + clientWidth,
-          behavior: 'smooth'
-        });
+        const { clientWidth } = scrollRef.current;
+        scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [campaign, isPaused]);
+  }, [gallery, isPaused]);
 
   const navScroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -187,14 +210,6 @@ function LandingContent() {
     setStep('concluido'); setLoading(false);
   };
 
-  const handleCancelarCompra = async () => {
-    if (!existingOrder || !confirm("Cancelar este pedido?")) return;
-    setLoading(true);
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
-    setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens');
-    setLoading(false);
-  };
-
   const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !existingOrder) return;
     setUploading(true);
@@ -205,6 +220,7 @@ function LandingContent() {
     await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
     setOrderStatus('pending');
+    const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
     alert("Comprovante enviado! ✅");
     setUploading(false);
   };
@@ -243,11 +259,12 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {campaign?.image_gallery?.length > 0 && (
+          {/* CARROSSEL COM LOOP INFINITO (HÍBRIDO) */}
+          {gallery.length > 0 && (
             <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
                 ref={scrollRef}
-                onScroll={handleScroll} // Detecta movimento para as bolinhas
+                onScroll={handleScroll}
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
                 onMouseEnter={() => setIsPaused(true)}
@@ -262,7 +279,7 @@ function LandingContent() {
                     gap: 0, 
                 }}
               >
-                {campaign.image_gallery.map((img: string, i: number) => (
+                {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ 
                       minWidth: '100%', 
                       width: '100%',
@@ -283,18 +300,18 @@ function LandingContent() {
               <button onClick={() => navScroll('left')} style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>‹</button>
               <button onClick={() => navScroll('right')} style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>›</button>
 
-              {/* BOLINHAS INDICADORAS (DINÂMICAS) */}
+              {/* BOLINHAS INDICADORAS */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 15 }}>
-                {campaign.image_gallery.map((_: any, i: number) => (
+                {gallery.map((_: any, i: number) => (
                   <div 
                     key={i} 
                     style={{ 
-                        width: activeIndex === i ? 18 : 6, // Bolinha ativa fica compridinha
+                        width: activeIndex === i ? 18 : 6,
                         height: 6, 
                         borderRadius: '10px', 
                         backgroundColor: '#059669', 
                         opacity: activeIndex === i ? 1 : 0.2,
-                        transition: 'all 0.3s ease' // Suaviza a mudança da bolinha
+                        transition: 'all 0.3s ease'
                     }}
                   ></div>
                 ))}
@@ -343,7 +360,7 @@ function LandingContent() {
                         {pastOrders.map((order: any) => (
                           <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
                               <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
                             </div>
                           </div>
