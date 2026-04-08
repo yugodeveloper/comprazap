@@ -58,10 +58,10 @@ function NovaCampanhaContent() {
             }
             
             if (loadedVars.length > 0) {
-              // Limpa o estado inicial antes de carregar os do banco
+              // CORREÇÃO: Forçando o mapeamento correto e limpando strings vazias
               setVariations(loadedVars.map((v: any) => ({ 
-                name: v.name, 
-                price: v.price.toString() 
+                name: v.name || '', 
+                price: v.price?.toString() || '' 
               })));
             }
           }
@@ -134,11 +134,14 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      await supabase.from('products').delete().eq('campaign_id', campId);
-      const { error: prodErr } = await supabase.from('products').insert({
-        campaign_id: campId,
-        variations: formattedVariations
-      });
+      // CORREÇÃO DEFINITIVA: Usamos UPSERT baseado no campaign_id
+      // Isso resolve tanto a criação quanto a edição sem erro de chave duplicada
+      const { error: prodErr } = await supabase
+        .from('products')
+        .upsert({
+          campaign_id: campId,
+          variations: formattedVariations
+        }, { onConflict: 'campaign_id' }); // Se o campaign_id já existir, ele faz UPDATE
 
       if (prodErr) throw prodErr;
 
