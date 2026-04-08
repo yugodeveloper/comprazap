@@ -68,11 +68,7 @@ function NovaCampanhaContent() {
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
-      const payload = {
-        title, description, pix_key: pixKey, expires_at: isoDate, max_sales: parseInt(maxSales),
-        image_url: headerImg || null, share_image: shareImg || null, image_gallery: gallery,
-        creator_id: userId, status: 'active'
-      };
+      const payload = { title, description, pix_key: pixKey, expires_at: isoDate, max_sales: parseInt(maxSales), image_url: headerImg || null, share_image: shareImg || null, image_gallery: gallery, creator_id: userId, status: 'active' };
 
       let campId = editId;
       if (editId) { await supabase.from('campaigns').update(payload).eq('id', editId); }
@@ -80,34 +76,32 @@ function NovaCampanhaContent() {
 
       const formattedVars = variations.filter(v => v.name && v.price).map(v => ({ name: v.name, price: parseFloat(v.price.toString().replace(',', '.')) }));
 
-      // SALVAMENTO GARANTIDO DE PRODUTOS
+      // LÓGICA DE SALVAMENTO BLINDADA: Deleta e insere para não dar erro de banco
       await supabase.from('products').delete().eq('campaign_id', campId);
-      await supabase.from('products').insert({
-        campaign_id: campId, name: title, price: formattedVars[0]?.price || 0, variations: formattedVars
-      });
+      await supabase.from('products').insert({ campaign_id: campId, name: title, price: formattedVars[0]?.price || 0, variations: formattedVars });
 
-      alert("Campanha salva com sucesso! 🚀"); router.push('/');
-    } catch (err: any) { alert("Erro: " + err.message); } finally { setLoading(false); }
+      alert("Salvo com sucesso! 🚀"); router.push('/');
+    } catch (err: any) { alert("Erro ao salvar: " + err.message); } finally { setLoading(false); }
   };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h1 style={{ fontSize: '18px', fontWeight: '900' }}>{editId ? 'Editar' : 'Nova'} Campanha ⚡</h1>
+        <h1 style={{ fontSize: '18px', fontWeight: '900' }}>Configurar Campanha ⚡</h1>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
             <label style={{ flex: 1, height: '100px', border: '2px dashed #ddd', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', backgroundColor:'white' }}>
               <input type="file" hidden onChange={e => handleUpload(e, 'header')} />
-              {headerImg ? <img src={headerImg} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : 'Capa Página'}
+              {headerImg ? <img src={headerImg} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : 'Capa'}
             </label>
             <label style={{ flex: 1, height: '100px', border: '2px dashed #059669', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', backgroundColor:'white' }}>
               <input type="file" hidden onChange={e => handleUpload(e, 'share')} />
-              {shareImg ? <img src={shareImg} style={{width:'100%', height:'100%', objectFit:'contain'}} /> : 'Polaroid Card'}
+              {shareImg ? <img src={shareImg} style={{width:'100%', height:'100%', objectFit:'contain'}} /> : 'Polaroid'}
             </label>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8' }}>GALERIA (ATÉ 5 FOTOS)</label>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8' }}>GALERIA (ATÉ 5)</label>
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
               {gallery.map((img, i) => (
                 <div key={i} style={{ width: '80px', height: '100px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
@@ -125,25 +119,25 @@ function NovaCampanhaContent() {
           </div>
 
           <input placeholder="Título" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={title} onChange={e => setTitle(e.target.value)} />
-          <textarea placeholder="História e sabores..." required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd', height:'120px'}} value={description} onChange={e => setDescription(e.target.value)} />
+          <textarea placeholder="Descrição" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd', height:'100px'}} value={description} onChange={e => setDescription(e.target.value)} />
           
           <div style={{ background: '#fff', padding: '15px', borderRadius: '25px', border: '1px solid #e2e8f0' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', display: 'block', marginBottom: '15px', textAlign: 'center' }}>OPÇÕES DE COMPRA</label>
+            <p style={{fontSize:'10px', fontWeight:900, color:'#94a3b8', marginBottom:'15px', textAlign:'center'}}>ITENS E PREÇOS</p>
             {variations.map((v, i) => (
               <div key={i} style={{display:'flex', gap:8, marginBottom:8}}>
                 <input placeholder="Produto" style={{flex:2, padding:'12px', borderRadius:'12px', border:'1px solid #ddd'}} value={v.name} onChange={e => { const n = [...variations]; n[i].name = e.target.value; setVariations(n); }} />
-                <input placeholder="R$" style={{flex:1, padding:'12px', borderRadius:'12px', border:'1px solid #ddd'}} value={v.price} onChange={e => { const n = [...variations]; n[i].price = e.target.value; setVariations(n); }} />
+                <input placeholder="Preço" style={{flex:1, padding:'12px', borderRadius:'12px', border:'1px solid #ddd'}} value={v.price} onChange={e => { const n = [...variations]; n[i].price = e.target.value; setVariations(n); }} />
               </div>
             ))}
-            <button type="button" onClick={() => setVariations([...variations, {name:'', price:''}])} style={{width:'100%', padding:'10px', border:'none', background:'#f8fafc', borderRadius:'12px', fontSize:'11px', fontWeight:900, color:'#059669'}}>+ NOVO ITEM</button>
+            <button type="button" onClick={() => setVariations([...variations, {name:'', price:''}])} style={{width:'100%', padding:'10px', border:'none', background:'#f8fafc', borderRadius:'12px', fontSize:'11px', fontWeight:900, color:'#059669'}}>+ ADICIONAR ITEM</button>
           </div>
           
           <div style={{display:'flex', gap:10}}>
-            <div style={{flex:1}}><label style={{fontSize:9, fontWeight:900, color:'#999'}}>EXPIRA EM</label><input placeholder="dd/mm/aaaa" style={{width:'100%', padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} /></div>
-            <div style={{width:80}}><label style={{fontSize:9, fontWeight:900, color:'#999'}}>LIMITE</label><input type="number" style={{width:'100%', padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={maxSales} onChange={e => setMaxSales(e.target.value)} /></div>
+            <div style={{flex:1}}><input placeholder="dd/mm/aaaa" style={{width:'100%', padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} /></div>
+            <div style={{width:80}}><input type="number" style={{width:'100%', padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={maxSales} onChange={e => setMaxSales(e.target.value)} /></div>
           </div>
-          <input placeholder="Sua Chave Pix" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={pixKey} onChange={e => setPixKey(e.target.value)} />
-          <button type="submit" disabled={loading} style={{ padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>{loading ? 'SALVANDO...' : 'SALVAR CAMPANHA 🚀'}</button>
+          <input placeholder="Chave Pix" required style={{padding:'15px', borderRadius:'15px', border:'1px solid #ddd'}} value={pixKey} onChange={e => setPixKey(e.target.value)} />
+          <button type="submit" disabled={loading} style={{ padding: '18px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', cursor: 'pointer' }}>SALVAR 🚀</button>
         </form>
       </div>
     </div>

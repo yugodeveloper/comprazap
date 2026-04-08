@@ -24,7 +24,7 @@ export default async function LandingPage({ params }: Props) {
   const { data: cp } = await supabase.from('campaigns').select('*').eq('id', params.id).single();
   return (
     <Suspense fallback={<div style={{textAlign:'center', marginTop:100, color: '#059669', fontWeight: 'bold'}}>Carregando...</div>}>
-      <LandingContent initialCampaign={cp} id={params.id} />
+      <LandingContent initialCampaign={cp} campaignId={params.id} />
     </Suspense>
   );
 }

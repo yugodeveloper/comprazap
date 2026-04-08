@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 
-export default function LandingContent({ initialCampaign, id }: { initialCampaign: any, id: string }) {
+export default function LandingContent({ initialCampaign, campaignId }: { initialCampaign: any, campaignId: string }) {
   const searchParams = useSearchParams()
   const autoPhone = searchParams.get('w')
   
@@ -74,52 +74,21 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     }
   };
 
-  // Funções de Telegram e Comprovante
-  const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
-    const total = itens.reduce((acc, curr) => acc + curr.total, 0);
-    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}`;
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
-    });
-  };
-
-  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string, total: number) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId, photo: imageUrl,
-        caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${total.toFixed(2)}\n\nAceita este pagamento?`,
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
-      })
-    });
-  };
-
-  // Ciclo de Vida e Dados
-  useEffect(() => { if (id) fetchData(); }, [id]);
-
+  // Logica de Dados
+  useEffect(() => { if (campaignId) fetchData(); }, [campaignId]);
+  
   async function fetchData() {
     try {
-      if (!campaign) {
-        const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single();
-        setCampaign(cp);
-      }
-      const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
+      const { data: cp } = await supabase.from('campaigns').select('*').eq('id', campaignId).single();
+      setCampaign(cp);
+      const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', campaignId).single();
       if (pd && pd.variations && typeof pd.variations === 'string') {
           pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
       }
       setProduct(pd);
-      const { data: sl } = await supabase.from('profiles').select('*').eq('id', campaign?.creator_id || initialCampaign?.creator_id).single();
+      const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
       setSeller(sl);
-      const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
+      const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', campaignId).neq('status', 'cancelled');
       setTotalBuyers(count || 0);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   }
@@ -128,7 +97,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     if (!phoneToAuth || phoneToAuth.length < 10) return;
     setLoading(true);
     try {
-      const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', id).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
+      const { data: orders } = await supabase.from('orders').select('*').eq('campaign_id', campaignId).eq('buyer_contact', phoneToAuth).order('created_at', { ascending: false });
       if (orders && orders.length > 0) {
         const pending = orders.find((o: any) => o.status !== 'paid' && o.status !== 'cancelled');
         setPastOrders(orders.filter((o: any) => o.status === 'paid')); 
@@ -143,10 +112,20 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
+  const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const total = itens.reduce((acc, curr) => acc + curr.total, 0);
+    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}`;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' }) });
+  };
+
   const concluirPedido = async () => {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
     setLoading(true);
-    const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations };
+    const orderData = { campaign_id: campaignId, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations: observations };
     const { data: savedOrder } = await supabase.from('orders').upsert(existingOrder?.id ? { id: existingOrder.id, ...orderData } : orderData).select().single();
     setExistingOrder(savedOrder);
     await enviarNotificacaoTelegram(savedOrder, itemsList);
@@ -154,7 +133,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
   };
 
   const handleLogout = () => {
-    if(!confirm("Sair deste pedido?")) return;
+    if(!confirm("Sair deste acesso?")) return;
     setContact(''); setBuyerName(''); setBuyerApto(''); setExistingOrder(null); setStep('identificacao');
   };
 
@@ -167,15 +146,13 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
     const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
     await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
-    const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
-    await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id, total);
     alert("Comprovante enviado! ✅");
     setUploading(false);
   };
 
-  if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando Oferta...</div>
+  if (loading) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando Oferta...</div>
 
-  const headerImage = campaign?.image_url || (campaign?.image_gallery?.length > 0 ? campaign.image_gallery[0] : null);
+  const headerImage = campaign?.image_url || (gallery.length > 0 ? gallery[0] : null);
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh', fontFamily: 'sans-serif' }}>
@@ -212,7 +189,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
 
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center', marginTop: 30 }}>
-              <input type="tel" placeholder="Seu WhatsApp" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', textAlign: 'center', fontSize: '18px' }} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
+              <input type="tel" placeholder="WhatsApp" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', textAlign: 'center', fontSize: '18px' }} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={() => identificarUsuario(contact)} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', marginTop: 10 }}>ACESSAR OFERTA</button>
             </div>
           )}
@@ -230,6 +207,7 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
               {itemsList.length > 0 && (
                 <div style={{marginTop: 20, background: '#f0fdf4', padding: 15, borderRadius: 15}}>
                   {itemsList.map(it => <div key={it.id} style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}><span>{it.name}</span><b>R$ {it.total}</b></div>)}
+                  <textarea placeholder="Observações..." style={{width:'100%', padding:'10px', borderRadius:'10px', marginTop:10}} value={observations} onChange={e => setObservations(e.target.value)} />
                   <button onClick={() => setStep('dados')} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', marginTop: 15, fontWeight: 900 }}>PRÓXIMO PASSO</button>
                 </div>
               )}
@@ -238,8 +216,8 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
 
           {step === 'dados' && (
             <div style={{ marginTop: 30 }}>
-              <input placeholder="Seu Nome Completo" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: 10 }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-              <input placeholder="Unidade / Apto" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
+              <input placeholder="Seu Nome" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: 10 }} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+              <input placeholder="Apto / Bloco" style={{ width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd' }} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', marginTop: 20, fontWeight: 900 }}>CONFIRMAR PEDIDO</button>
             </div>
           )}
@@ -249,12 +227,10 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
               <QRCodeSVG value={campaign?.pix_key || ''} size={200} />
               <p style={{fontSize: 20, fontWeight: 900, color: '#059669', marginTop: 15}}>Total: R$ {itemsList.reduce((acc, curr) => acc + curr.total, 0).toFixed(2)}</p>
               <button onClick={copyPix} style={{ width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900' }}>COPIAR PIX</button>
-              
-              <div style={{marginTop: 20, borderTop: '1px solid #eee', paddingTop: 20}}>
-                <p style={{fontSize: 11, fontWeight: 900, color: '#999'}}>ENVIAR COMPROVANTE</p>
-                <input type="file" accept="image/*" onChange={handleUploadComprovante} disabled={uploading} style={{fontSize: 12}} />
+              <div style={{marginTop:20, borderTop:'1px solid #eee', paddingTop:20}}>
+                <p style={{fontSize:10, fontWeight:900, color:'#999'}}>ENVIE O COMPROVANTE:</p>
+                <input type="file" accept="image/*" onChange={handleUploadComprovante} />
               </div>
-              
               <button onClick={handleLogout} style={{background:'none', border:'none', color:'red', textDecoration:'underline', marginTop:30, cursor:'pointer'}}>Sair / Novo Pedido</button>
             </div>
           )}
