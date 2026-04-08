@@ -13,21 +13,17 @@ function NovaCampanhaContent() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [pixKey, setPixKey] = useState('')
-  const [expiresAt, setExpiresAt] = useState('') // Agora receberá dd/mm/aaaa
+  const [expiresAt, setExpiresAt] = useState('')
   const [maxSales, setMaxSales] = useState('50')
   
   const [headerImg, setHeaderImg] = useState('')
+  const [shareImg, setShareImg] = useState('') // Nova Foto de Divulgação
   const [gallery, setGallery] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
-  // Máscara para Data dd/mm/aaaa
   const maskDate = (value: string) => {
-    return value
-      .replace(/\D/g, "")
-      .replace(/(\d{2})(\d)/, "$1/$2")
-      .replace(/(\d{2})(\d)/, "$1/$2")
-      .replace(/(\/\d{4})\d+?$/, "$1");
+    return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
   };
 
   useEffect(() => {
@@ -38,18 +34,14 @@ function NovaCampanhaContent() {
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
-          
-          // Converte ISO do banco para dd/mm/aaaa
           if (camp.expires_at) {
             const date = new Date(camp.expires_at);
-            const formatted = date.toLocaleDateString('pt-BR');
-            setExpiresAt(formatted);
+            setExpiresAt(date.toLocaleDateString('pt-BR'));
           }
-          
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
+          setShareImg(camp.share_image || ''); // Carrega foto share
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
-          
           if (camp.products && camp.products.length > 0) {
             const vars = camp.products[0].variations;
             if (Array.isArray(vars)) {
@@ -62,7 +54,7 @@ function NovaCampanhaContent() {
     }
   }, [editId]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, isHeader: boolean) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'header' | 'share' | 'gallery') => {
     if (!e.target.files || e.target.files.length === 0) return
     setUploading(true)
     const files = Array.from(e.target.files)
@@ -72,7 +64,8 @@ function NovaCampanhaContent() {
       const { error: upErr } = await supabase.storage.from('comprovantes').upload(fileName, file)
       if (!upErr) {
         const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
-        if (isHeader) setHeaderImg(publicUrl)
+        if (type === 'header') setHeaderImg(publicUrl)
+        else if (type === 'share') setShareImg(publicUrl)
         else setGallery(prev => [...prev, publicUrl].slice(0, 5))
       }
     }
@@ -81,7 +74,6 @@ function NovaCampanhaContent() {
 
   const addVariation = () => setVariations([...variations, { name: '', price: '' }])
   const removeVariation = (index: number) => setVariations(variations.filter((_, i) => i !== index))
-  
   const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
     const newVars = [...variations]
     newVars[index][field] = value
@@ -93,8 +85,6 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      
-      // Converte dd/mm/aaaa para formato de data aceito pelo Postgres
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -105,6 +95,7 @@ function NovaCampanhaContent() {
         expires_at: isoDate,
         max_sales: parseInt(maxSales), 
         image_url: headerImg || null,
+        share_image: shareImg || null, // Salva foto share
         image_gallery: gallery, 
         creator_id: userId, 
         status: 'active'
@@ -151,19 +142,43 @@ function NovaCampanhaContent() {
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Campanha</label>
-            {headerImg ? (
-              <div style={{ width: '100%', height: '120px', borderRadius: '15px', overflow: 'hidden', position: 'relative' }}>
-                <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '25px', height: '25px', cursor: 'pointer' }}>✕</button>
+          
+          <div style={{ display: 'flex', gap: '15px' }}>
+            {/* CAPA TRADICIONAL */}
+            <div style={{ flex: 2 }}>
+              <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
+              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
+                {headerImg ? (
+                  <>
+                    <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                  </>
+                ) : (
+                  <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} disabled={uploading} />
+                    <span style={{ fontSize: '10px', color: '#94a3b8' }}>+ Capa</span>
+                  </label>
+                )}
               </div>
-            ) : (
-              <label style={{ width: '100%', height: '100px', borderRadius: '15px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: 'white' }}>
-                <input type="file" accept="image/*" hidden onChange={(e) => handleUpload(e, true)} disabled={uploading} />
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>{uploading ? 'Processando...' : '+ Adicionar Capa'}</span>
-              </label>
-            )}
+            </div>
+
+            {/* FOTO POLAROID (DIVULGAÇÃO) */}
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Foto WhatsApp</label>
+              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
+                {shareImg ? (
+                  <>
+                    <img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                  </>
+                ) : (
+                  <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
+                    <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} disabled={uploading} />
+                    <span style={{ fontSize: '9px', color: '#059669', fontWeight: 'bold' }}>Polaroid 📸</span>
+                  </label>
+                )}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -177,7 +192,7 @@ function NovaCampanhaContent() {
                 ))}
                 {gallery.length < 5 && (
                   <label style={{ width: '80px', height: '110px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor: 'white' }}>
-                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, false)} disabled={uploading} />
+                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, 'gallery')} disabled={uploading} />
                     <span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
                   </label>
                 )}
@@ -202,13 +217,7 @@ function NovaCampanhaContent() {
           <div style={{ display: 'flex', gap: '10px' }}>
              <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
-                <input 
-                  placeholder="dd/mm/aaaa" 
-                  required 
-                  style={inputStyle} 
-                  value={expiresAt} 
-                  onChange={e => setExpiresAt(maskDate(e.target.value))} 
-                />
+                <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
              </div>
              <div style={{ width: '100px' }}>
                 <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>LIMITE</label>
