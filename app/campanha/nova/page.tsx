@@ -48,6 +48,7 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
+          // CARREGAMENTO DAS VARIAÇÕES - Busca na tabela products associada
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
             if (prod.variations && Array.isArray(prod.variations)) {
@@ -123,7 +124,8 @@ function NovaCampanhaContent() {
       }
 
       const formattedVariations = variations.map(v => ({
-        name: v.name, price: parseFloat(v.price.toString().replace(',', '.'))
+        name: v.name, 
+        price: parseFloat(v.price.toString().replace(',', '.'))
       }))
 
       // SALVAMENTO ROBUSTO DOS PRODUTOS
@@ -134,7 +136,16 @@ function NovaCampanhaContent() {
         variations: formattedVariations 
       }, { onConflict: 'campaign_id' });
 
-      if (prodErr) throw prodErr;
+      // Fallback: se o upsert falhar por causa da regra unique do banco, deletamos e inserimos
+      if (prodErr) {
+        await supabase.from('products').delete().eq('campaign_id', campId);
+        await supabase.from('products').insert({ 
+          campaign_id: campId, 
+          name: title, 
+          price: formattedVariations[0].price, 
+          variations: formattedVariations 
+        });
+      }
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/'; 
@@ -156,14 +167,13 @@ function NovaCampanhaContent() {
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
           <div style={{ display: 'flex', gap: '15px' }}>
             <div style={{ flex: 1.5 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
               <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
                 {headerImg ? (
                   <>
-                    <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                     <button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
                   </>
                 ) : (
@@ -180,7 +190,7 @@ function NovaCampanhaContent() {
               <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
                 {shareImg ? (
                   <>
-                    <img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
                     <button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
                   </>
                 ) : (
@@ -199,7 +209,7 @@ function NovaCampanhaContent() {
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
                   </div>
                 ))}
