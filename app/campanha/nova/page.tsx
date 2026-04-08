@@ -47,21 +47,21 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
+          // --- CORREÇÃO DEFINITIVA DA CARGA DE ITENS ---
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
-            let loadedVars = [];
+            let finalVariations = [];
             
             if (Array.isArray(prod.variations)) {
-              loadedVars = prod.variations;
+              finalVariations = prod.variations;
             } else if (typeof prod.variations === 'string') {
-              try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
+              try { finalVariations = JSON.parse(prod.variations); } catch(e) { finalVariations = []; }
             }
-            
-            if (loadedVars.length > 0) {
-              // CORREÇÃO: Forçando o mapeamento correto e limpando strings vazias
-              setVariations(loadedVars.map((v: any) => ({ 
-                name: v.name || '', 
-                price: v.price?.toString() || '' 
+
+            if (finalVariations.length > 0) {
+              setVariations(finalVariations.map((v: any) => ({
+                name: v.name || '',
+                price: v.price?.toString() || ''
               })));
             }
           }
@@ -105,7 +105,7 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não identificado. Faça login novamente.");
+      if (!userId) throw new Error("Usuário não identificado.");
 
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
@@ -123,7 +123,6 @@ function NovaCampanhaContent() {
       } else {
         const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
         if (campErr) throw campErr;
-        if (!camp) throw new Error("Erro ao criar campanha.");
         campId = camp.id;
       }
 
@@ -134,14 +133,13 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      // CORREÇÃO DEFINITIVA: Usamos UPSERT baseado no campaign_id
-      // Isso resolve tanto a criação quanto a edição sem erro de chave duplicada
+      // --- UPSERT PARA EVITAR DUPLICIDADE E ERRO DE SALVAMENTO ---
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({
           campaign_id: campId,
           variations: formattedVariations
-        }, { onConflict: 'campaign_id' }); // Se o campaign_id já existir, ele faz UPDATE
+        }, { onConflict: 'campaign_id' });
 
       if (prodErr) throw prodErr;
 
@@ -182,7 +180,7 @@ function NovaCampanhaContent() {
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
