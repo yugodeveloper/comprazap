@@ -23,6 +23,7 @@ function NovaCampanhaContent() {
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
   const [existingProductId, setExistingProductId] = useState<string | null>(null)
+  const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
@@ -38,6 +39,7 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
+          setDebugData(camp.products); 
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -49,16 +51,20 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          if (camp.products) {
-            const prod = Array.isArray(camp.products) ? camp.products[0] : camp.products;
+          const prodData = camp.products;
+          if (prodData) {
+            const prod = Array.isArray(prodData) ? prodData[0] : prodData;
+            
             if (prod) {
               setExistingProductId(prod.id);
+              
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
                 try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
               } else {
                 loadedVars = prod.variations;
               }
+
               if (Array.isArray(loadedVars) && loadedVars.length > 0) {
                 setVariations(loadedVars.map((v: any) => ({
                   name: String(v.name || ''),
@@ -107,6 +113,8 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
+      if (!userId) throw new Error("Usuário não identificado.");
+
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -118,10 +126,11 @@ function NovaCampanhaContent() {
 
       let campId = editId;
       if (editId) {
-        await supabase.from('campaigns').update(payload).eq('id', editId);
+        const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
+        if (campErr) throw campErr;
       } else {
-        const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
-        if (!camp) throw new Error("Erro ao criar campanha.");
+        const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
+        if (campErr || !camp) throw new Error("Erro ao criar campanha.");
         campId = camp.id;
       }
 
@@ -132,27 +141,23 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // --- ESTRATÉGIA DE SALVAMENTO ALTERNATIVA (MANUAL) ---
-      // Tentamos atualizar pelo campaign_id. Se o retorno for vazio, inserimos.
-      const { data: updateData, error: upError } = await supabase
+      // CORREÇÃO FINAL: UPSERT UTILIZANDO O CAMPO DE CONFLITO 'campaign_id'
+      const { error: prodErr } = await supabase
         .from('products')
-        .update({ variations: formattedVariations })
-        .eq('campaign_id', campId)
-        .select();
+        .upsert(
+          {
+            campaign_id: campId,
+            variations: formattedVariations
+          }, 
+          { onConflict: 'campaign_id' }
+        );
 
-      if (upError || !updateData || updateData.length === 0) {
-        // Se não conseguiu dar update, tenta o insert
-        const { error: insError } = await supabase
-          .from('products')
-          .insert({ campaign_id: campId, variations: formattedVariations });
-          
-        if (insError) throw insError;
-      }
+      if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
-      console.error("Erro no salvamento:", err);
+      console.error("Erro detalhado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -164,6 +169,7 @@ function NovaCampanhaContent() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+        
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
@@ -218,7 +224,9 @@ function NovaCampanhaContent() {
                 <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
                 <div style={{ position: 'relative' }}>
                   <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
-                  <input type="date" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
+                  <input 
+                    type="date" 
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
                     onChange={e => {
                       const date = new Date(e.target.value + 'T00:00:00');
                       setExpiresAt(date.toLocaleDateString('pt-BR'));
