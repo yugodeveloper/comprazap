@@ -31,6 +31,18 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
+  // Paleta de cores pastéis para os botões de itens
+  const pastelColors = [
+    '#fef2f2', // Vermelho/Rosa suave
+    '#fff7ed', // Laranja suave
+    '#fefce8', // Amarelo suave
+    '#f0fdf4', // Verde suave
+    '#eff6ff', // Azul suave
+    '#faf5ff', // Roxo suave
+    '#fdf2f8', // Rosa suave
+    '#f8fafc', // Cinza azulado suave
+  ];
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -383,8 +395,26 @@ function LandingContent() {
                 <p style={{ fontSize: 9, fontWeight: 900, color: '#999', marginBottom: 12, textAlign: 'center', textTransform: 'uppercase' }}>O QUE VOCÊ DESEJA?</p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {product?.variations?.map((v: any, index: number) => (
-                    <button key={index} onClick={() => setTempSelection(v)} style={{ padding: '10px 15px', borderRadius: '12px', border: '1px solid #ddd', fontSize: '12px', fontWeight: 'bold', backgroundColor: tempSelection?.name === v.name ? '#059669' : 'white', color: tempSelection?.name === v.name ? 'white' : '#444' }}>
-                      {v.name}<br/><span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>R$ {v.price}</span>
+                    <button 
+                      key={index} 
+                      onClick={() => setTempSelection(v)} 
+                      style={{ 
+                        padding: '10px 15px', 
+                        borderRadius: '12px', 
+                        border: tempSelection?.name === v.name ? '2px solid #059669' : '1px solid #ddd', 
+                        fontSize: '12px', 
+                        fontWeight: 'bold', 
+                        // Aplicação da cor pastel aleatória baseada no index
+                        backgroundColor: tempSelection?.name === v.name ? '#059669' : pastelColors[index % pastelColors.length], 
+                        color: tempSelection?.name === v.name ? 'white' : '#444',
+                        transition: 'all 0.2s ease',
+                        minWidth: '120px'
+                      }}
+                    >
+                      {v.name}<br/>
+                      <span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>
+                        R$ {v.price}
+                      </span>
                     </button>
                   ))}
                 </div>
