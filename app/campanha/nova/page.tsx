@@ -22,7 +22,7 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
-  // GUARDA O ID DO PRODUTO PARA RESOLVER O ERRO DE RLS NO UPSERT
+  // PERSISTÊNCIA DO ID DO PRODUTO PARA RESOLVER O ERRO DE RLS NO UPDATE
   const [existingProductId, setExistingProductId] = useState<string | null>(null)
   const [debugData, setDebugData] = useState<any>(null)
 
@@ -57,7 +57,7 @@ function NovaCampanhaContent() {
             const prod = Array.isArray(prodData) ? prodData[0] : prodData;
             
             if (prod) {
-              // ARMAZENA O ID DA TABELA PRODUCTS PARA O SUBMIT
+              // GUARDA O ID PARA O UPSERT SABER QUE É UMA EDIÇÃO
               setExistingProductId(prod.id);
               
               let loadedVars = [];
@@ -142,7 +142,7 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // MONTA O PAYLOAD DO PRODUTO INCLUINDO O ID EXISTENTE SE HOUVER
+      // MONTAGEM DO PAYLOAD DO PRODUTO: SE HOUVER ID, O SUPABASE FAZ O UPDATE CORRETAMENTE
       const productPayload: any = {
         campaign_id: campId,
         variations: formattedVariations
@@ -196,7 +196,7 @@ function NovaCampanhaContent() {
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
