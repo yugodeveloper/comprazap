@@ -47,22 +47,29 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // --- CORREÇÃO DEFINITIVA DA CARGA DE ITENS ---
-          if (camp.products && camp.products.length > 0) {
+          // --- BLINDAGEM MÁXIMA NA CARGA DE VARIAÇÕES ---
+          if (camp.products && Array.isArray(camp.products) && camp.products.length > 0) {
             const prod = camp.products[0];
-            let finalVariations = [];
+            let rawVars = prod.variations;
             
-            if (Array.isArray(prod.variations)) {
-              finalVariations = prod.variations;
-            } else if (typeof prod.variations === 'string') {
-              try { finalVariations = JSON.parse(prod.variations); } catch(e) { finalVariations = []; }
+            let finalArray = [];
+            
+            // Garantimos que rawVars vire um Array, não importa como venha do banco
+            if (typeof rawVars === 'string') {
+              try { finalArray = JSON.parse(rawVars); } catch(e) { finalArray = []; }
+            } else if (Array.isArray(rawVars)) {
+              finalArray = rawVars;
             }
 
-            if (finalVariations.length > 0) {
-              setVariations(finalVariations.map((v: any) => ({
-                name: v.name || '',
-                price: v.price?.toString() || ''
-              })));
+            if (finalArray.length > 0) {
+              // Mapeamos forçando string no price para não quebrar o input
+              const mapped = finalArray.map((v: any) => ({
+                name: String(v.name || ''),
+                price: String(v.price || '')
+              }));
+              
+              setVariations(mapped);
+              console.log("Variations sincronizadas no formulário:", mapped);
             }
           }
         }
@@ -105,7 +112,7 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não identificado.");
+      if (!userId) throw new Error("Sessão expirada.");
 
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
@@ -130,10 +137,10 @@ function NovaCampanhaContent() {
         .filter(v => v.name && v.price)
         .map(v => ({
           name: v.name, 
-          price: parseFloat(v.price.toString().replace(',', '.'))
+          price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // --- UPSERT PARA EVITAR DUPLICIDADE E ERRO DE SALVAMENTO ---
+      // --- UPSERT BLINDADO ---
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({
@@ -146,7 +153,7 @@ function NovaCampanhaContent() {
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
-      console.error("Erro detalhado:", err);
+      console.error("Erro no submit:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
