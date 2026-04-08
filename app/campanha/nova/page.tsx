@@ -22,6 +22,8 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
+  // GUARDA O ID DO PRODUTO PARA RESOLVER O ERRO DE RLS NO UPSERT
+  const [existingProductId, setExistingProductId] = useState<string | null>(null)
   const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
@@ -50,13 +52,14 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // --- CORREÇÃO BASEADA NO DEBUG: Trata products como objeto ou array ---
           const prodData = camp.products;
           if (prodData) {
-            // Pega o objeto de produto (seja ele o item direto ou o primeiro do array)
             const prod = Array.isArray(prodData) ? prodData[0] : prodData;
             
-            if (prod && prod.variations) {
+            if (prod) {
+              // ARMAZENA O ID DA TABELA PRODUCTS PARA O SUBMIT
+              setExistingProductId(prod.id);
+              
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
                 try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
@@ -112,6 +115,8 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
+      if (!userId) throw new Error("Usuário não identificado.");
+
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -126,6 +131,7 @@ function NovaCampanhaContent() {
         await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
         const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
+        if (!camp) throw new Error("Erro ao criar campanha.");
         campId = camp.id;
       }
 
@@ -136,19 +142,26 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // Usamos UPSERT para evitar erros de chave duplicada na edição
+      // MONTA O PAYLOAD DO PRODUTO INCLUINDO O ID EXISTENTE SE HOUVER
+      const productPayload: any = {
+        campaign_id: campId,
+        variations: formattedVariations
+      };
+
+      if (existingProductId) {
+        productPayload.id = existingProductId;
+      }
+
       const { error: prodErr } = await supabase
         .from('products')
-        .upsert({
-          campaign_id: campId,
-          variations: formattedVariations
-        }, { onConflict: 'campaign_id' });
+        .upsert(productPayload, { onConflict: 'campaign_id' });
 
       if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
+      console.error("Erro detalhado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -161,13 +174,6 @@ function NovaCampanhaContent() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
         
-        {editId && (
-          <div style={{ fontSize: '10px', background: '#333', color: '#0f0', padding: '10px', borderRadius: '10px', overflowX: 'auto' }}>
-            <strong>DEBUG - DADOS DOS PRODUTOS NO BANCO:</strong>
-            <pre>{JSON.stringify(debugData, null, 2)}</pre>
-          </div>
-        )}
-
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
@@ -190,7 +196,7 @@ function NovaCampanhaContent() {
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
