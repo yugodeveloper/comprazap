@@ -25,7 +25,17 @@ function NovaCampanhaContent() {
   useEffect(() => {
     if (editId) {
       const loadEditData = async () => {
-        const { data: camp } = await supabase.from('campaigns').select('*, products(*)').eq('id', editId).single();
+        const { data: camp, error } = await supabase
+          .from('campaigns')
+          .select('*, products(*)')
+          .eq('id', editId)
+          .single();
+        
+        if (error) {
+          console.error("Erro ao carregar:", error);
+          return;
+        }
+
         if (camp) {
           setTitle(camp.title || '');
           setDescription(camp.description || '');
@@ -33,7 +43,7 @@ function NovaCampanhaContent() {
           setExpiresAt(camp.expires_at?.split('T')[0] || '');
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
-          setGallery(camp.image_gallery || []);
+          setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
           if (camp.products && camp.products.length > 0) {
             const vars = camp.products[0].variations;
@@ -78,23 +88,23 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      
-      // CRUCIAL: Se a string estiver vazia (você clicou no X), enviamos NULL para o Postgres apagar.
-      const finalImageUrl = headerImg && headerImg.length > 0 ? headerImg : null;
+      if (!userId) throw new Error("Usuário não logado.");
 
+      // Forçamos valores nulos se estiverem vazios para limpar no banco
       const payload = {
-        title, 
-        description, 
-        pix_key: pixKey, 
+        title: title,
+        description: description,
+        pix_key: pixKey,
         expires_at: expiresAt,
-        max_sales: parseInt(maxSales), 
-        image_url: finalImageUrl, 
-        image_gallery: gallery, 
-        creator_id: userId, 
+        max_sales: parseInt(maxSales),
+        image_url: headerImg && headerImg.trim() !== '' ? headerImg : null,
+        image_gallery: gallery && gallery.length > 0 ? gallery : [], // Se vazio, envia array vazio
+        creator_id: userId,
         status: 'active'
       };
 
       let campId = editId;
+
       if (editId) {
         const { error: updErr } = await supabase
           .from('campaigns')
@@ -114,21 +124,28 @@ function NovaCampanhaContent() {
       }
 
       const formattedVariations = variations.map(v => ({
-        name: v.name, price: parseFloat(v.price.replace(',', '.'))
+        name: v.name, 
+        price: parseFloat(v.price.replace(',', '.'))
       }))
 
-      // Atualiza o produto associado
-      await supabase.from('products').update({ 
-        name: title, 
-        price: formattedVariations[0].price, 
-        variations: formattedVariations 
-      }).eq('campaign_id', campId);
+      // Sincroniza o Produto
+      const { error: prodErr } = await supabase
+        .from('products')
+        .upsert({ 
+          campaign_id: campId, 
+          name: title, 
+          price: formattedVariations[0].price, 
+          variations: formattedVariations 
+        }, { onConflict: 'campaign_id' });
+
+      if (prodErr) console.error("Erro ao atualizar produto:", prodErr);
 
       alert("Campanha salva com sucesso! 🚀");
       router.push('/');
       router.refresh();
     } catch (err: any) { 
       alert("Erro ao salvar: " + err.message); 
+      console.error(err);
     } finally { 
       setLoading(false); 
     }
@@ -141,7 +158,7 @@ function NovaCampanhaContent() {
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>Editar Campanha ⚡</h1>
+          <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} ⚡</h1>
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -166,7 +183,7 @@ function NovaCampanhaContent() {
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                     <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
+                    <button type="button" onClick={() => setGallery(prev => prev.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer' }}>✕</button>
                   </div>
                 ))}
                 {gallery.length < 5 && (
