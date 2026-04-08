@@ -48,11 +48,9 @@ function LandingContent() {
     }
   };
 
-  // 1. Prepara a lista para o Loop (Clone do último no início e do primeiro no fim)
   const gallery = campaign?.image_gallery || [];
   const loopItems = gallery.length > 1 ? [gallery[gallery.length - 1], ...gallery, gallery[0]] : gallery;
 
-  // 2. Posiciona o scroll no item real (índice 1) ao carregar
   useEffect(() => {
     if (gallery.length > 1 && scrollRef.current && !isReady) {
       const width = scrollRef.current.clientWidth;
@@ -61,21 +59,15 @@ function LandingContent() {
     }
   }, [gallery, isReady]);
 
-  // 3. Lógica de "Salto Invisível" para criar o Loop Infinito
   const handleScroll = () => {
     if (scrollRef.current && gallery.length > 1) {
       const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
-      
-      // Se chegou no clone do final (último item da lista estendida)
       if (scrollLeft <= 0) {
         scrollRef.current.scrollTo({ left: scrollWidth - (2 * clientWidth) });
       } 
-      // Se chegou no clone do início (primeiro item da lista estendida)
       else if (scrollLeft >= scrollWidth - clientWidth) {
         scrollRef.current.scrollTo({ left: clientWidth });
       }
-
-      // Atualiza a bolinha ignorando os clones
       const index = Math.round(scrollLeft / clientWidth) - 1;
       if (index >= 0 && index < gallery.length) {
         setActiveIndex(index);
@@ -83,17 +75,14 @@ function LandingContent() {
     }
   };
 
-  // 4. Autoplay por Slide
   useEffect(() => {
     if (gallery.length <= 1 || isPaused) return;
-
     const interval = setInterval(() => {
       if (scrollRef.current) {
         const { clientWidth } = scrollRef.current;
         scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
       }
     }, 5000);
-
     return () => clearInterval(interval);
   }, [gallery, isPaused]);
 
@@ -210,6 +199,19 @@ function LandingContent() {
     setStep('concluido'); setLoading(false);
   };
 
+  // FUNÇÃO RESTAURADA: handleCancelarCompra
+  const handleCancelarCompra = async () => {
+    if (!existingOrder || !confirm("Cancelar este pedido?")) return;
+    setLoading(true);
+    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
+    setExistingOrder(null); 
+    setOrderStatus('pending'); 
+    setItemsList([]); 
+    setObservations(''); 
+    setStep('itens');
+    setLoading(false);
+  };
+
   const handleUploadComprovante = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !existingOrder) return;
     setUploading(true);
@@ -220,7 +222,6 @@ function LandingContent() {
     await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
     setOrderStatus('pending');
-    const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
     alert("Comprovante enviado! ✅");
     setUploading(false);
   };
@@ -259,7 +260,6 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL COM LOOP INFINITO (HÍBRIDO) */}
           {gallery.length > 0 && (
             <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
@@ -296,11 +296,9 @@ function LandingContent() {
                 ))}
               </div>
 
-              {/* SETAS DISCRETAS */}
               <button onClick={() => navScroll('left')} style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>‹</button>
               <button onClick={() => navScroll('right')} style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>›</button>
 
-              {/* BOLINHAS INDICADORAS */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 15 }}>
                 {gallery.map((_: any, i: number) => (
                   <div 
@@ -319,7 +317,6 @@ function LandingContent() {
             </div>
           )}
 
-          {/* DESCRIÇÃO */}
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
               {campaign?.description}
