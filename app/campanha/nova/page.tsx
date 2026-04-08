@@ -21,9 +21,6 @@ function NovaCampanhaContent() {
   const [gallery, setGallery] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
-  
-  const [existingProductId, setExistingProductId] = useState<string | null>(null)
-  const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
@@ -39,7 +36,6 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
-          setDebugData(camp.products); 
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -54,14 +50,15 @@ function NovaCampanhaContent() {
           const prodData = camp.products;
           if (prodData) {
             const prod = Array.isArray(prodData) ? prodData[0] : prodData;
-            if (prod) {
-              setExistingProductId(prod.id);
+            
+            if (prod && prod.variations) {
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
                 try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
               } else {
                 loadedVars = prod.variations;
               }
+
               if (Array.isArray(loadedVars) && loadedVars.length > 0) {
                 setVariations(loadedVars.map((v: any) => ({
                   name: String(v.name || ''),
@@ -109,10 +106,8 @@ function NovaCampanhaContent() {
     e.preventDefault()
     setLoading(true)
     try {
-      // DEBUG CRUCIAL: Verificando quem o sistema acha que você é
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("Dono da sessão Supabase Auth:", user?.id);
-      console.log("ID guardado no LocalStorage:", localStorage.getItem('user_id'));
+      const userId = localStorage.getItem('user_id')
+      if (!userId) throw new Error("Usuário não identificado.");
 
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
@@ -120,8 +115,7 @@ function NovaCampanhaContent() {
       const payload = {
         title, description, pix_key: pixKey, expires_at: isoDate, max_sales: parseInt(maxSales),
         image_url: headerImg || null, share_image: shareImg || null, image_gallery: gallery,
-        creator_id: localStorage.getItem('user_id'), 
-        status: 'active'
+        creator_id: userId, status: 'active'
       };
 
       let campId = editId;
@@ -129,7 +123,8 @@ function NovaCampanhaContent() {
         await supabase.from('campaigns').update(payload).eq('id', editId);
       } else {
         const { data: camp } = await supabase.from('campaigns').insert(payload).select().single();
-        campId = camp?.id;
+        if (!camp) throw new Error("Erro ao criar campanha.");
+        campId = camp.id;
       }
 
       const formattedVariations = variations
@@ -139,7 +134,6 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // Usamos UPSERT simples agora que o RLS está desativado no Passo 1
       const { error: prodErr } = await supabase
         .from('products')
         .upsert({
@@ -152,7 +146,6 @@ function NovaCampanhaContent() {
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
-      console.error("Erro completo disparado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -164,13 +157,13 @@ function NovaCampanhaContent() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+        
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Blocos de inputs idênticos ao seu original... */}
           <div style={{ display: 'flex', gap: '15px' }}>
             <label style={{ flex: 1.5, height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', cursor:'pointer' }}>
               <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} />
@@ -219,7 +212,9 @@ function NovaCampanhaContent() {
                 <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
                 <div style={{ position: 'relative' }}>
                   <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
-                  <input type="date" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
+                  <input 
+                    type="date" 
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
                     onChange={e => {
                       const date = new Date(e.target.value + 'T00:00:00');
                       setExpiresAt(date.toLocaleDateString('pt-BR'));
