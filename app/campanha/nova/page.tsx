@@ -102,10 +102,10 @@ function NovaCampanhaContent() {
       }
 
       const formattedVariations = variations.map(v => ({
-        name: v.name, price: parseFloat(v.price.replace(',', '.'))
+        name: v.name, price: parseFloat(v.price.toString().replace(',', '.'))
       }))
 
-      // LÓGICA NUCLEAR: Deleta e insere para garantir que salve sempre
+      // LÓGICA INFALÍVEL PARA PRODUTOS: Deleta e insere novamente.
       await supabase.from('products').delete().eq('campaign_id', campId);
       await supabase.from('products').insert({
         campaign_id: campId,
@@ -134,7 +134,7 @@ function NovaCampanhaContent() {
           <div style={{ display: 'flex', gap: '15px' }}>
             <div style={{ flex: 1.5 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
-              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
+              <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
                 {headerImg ? (
                   <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer' }}>✕</button></>
                 ) : (
@@ -146,7 +146,7 @@ function NovaCampanhaContent() {
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Foto WhatsApp</label>
-              <div style={{ marginTop: '5px', height: '100px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
+              <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
                 {shareImg ? (
                   <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer' }}>✕</button></>
                 ) : (
