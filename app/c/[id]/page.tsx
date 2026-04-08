@@ -32,6 +32,10 @@ function LandingContent() {
   const [tempQty, setTempQty] = useState(1)
 
   const [isPaused, setIsPaused] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
@@ -44,7 +48,6 @@ function LandingContent() {
     }
   };
 
-  // PERSISTÊNCIA DO CARRINHO
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
@@ -61,7 +64,6 @@ function LandingContent() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
-  // NOTIFICAÇÕES TELEGRAM
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -191,6 +193,26 @@ function LandingContent() {
     setUploading(false);
   };
 
+  // Funções para Mouse Drag (Desktop)
+  const onMouseDown = (e: React.MouseEvent) => {
+    setIsPaused(true);
+    setIsDragging(true);
+    setStartX(e.pageX - (scrollRef.current?.offsetLeft || 0));
+    setScrollLeft(scrollRef.current?.scrollLeft || 0);
+  };
+  const onMouseLeave = () => {
+    setIsDragging(false);
+    setIsPaused(false);
+  };
+  const onMouseUp = () => setIsDragging(false);
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - (scrollRef.current.offsetLeft || 0);
+    const walk = (x - startX) * 2;
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
+
   const InfoBadge = ({label, value}: {label: string, value: string}) => (
     <div style={{ flex: 1, textAlign: 'center', padding: '10px 5px', borderRight: '1px solid #f1f5f9' }}>
       <p style={{ margin: 0, fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</p>
@@ -208,7 +230,6 @@ function LandingContent() {
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
-      {/* CSS AJUSTADO PARA IPHONE: Animação suave e inércia real */}
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
@@ -219,14 +240,13 @@ function LandingContent() {
           width: max-content;
           animation: marquee 40s linear infinite;
         }
-        .paused {
+        .paused-anim {
           animation-play-state: paused !important;
         }
       `}</style>
 
       <div style={containerStyle}>
         
-        {/* HEADER */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -234,7 +254,6 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* INFO */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -243,25 +262,26 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL HÍBRIDO DEFINITIVO */}
           {campaign?.image_gallery?.length > 0 && (
             <div style={{ marginBottom: 25 }}>
               <div 
-                style={{ 
-                    overflowX: 'auto', 
-                    overflowY: 'hidden',
-                    borderRadius: '20px',
-                    WebkitOverflowScrolling: 'touch', // Habilita inércia no iOS
-                    scrollSnapType: 'x mandatory',
-                    scrollbarWidth: 'none'
-                }}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
+                ref={scrollRef}
+                onMouseDown={onMouseDown}
+                onMouseLeave={onMouseLeave}
+                onMouseUp={onMouseUp}
+                onMouseMove={onMouseMove}
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
+                style={{ 
+                    overflowX: isPaused ? 'auto' : 'hidden', 
+                    borderRadius: '20px',
+                    WebkitOverflowScrolling: 'touch',
+                    scrollSnapType: isPaused ? 'x mandatory' : 'none',
+                    scrollbarWidth: 'none',
+                    cursor: isDragging ? 'grabbing' : 'grab'
+                }}
               >
-                <div className={`marquee-wrapper ${isPaused ? 'paused' : ''}`}>
-                  {/* Duplicamos a lista para o loop infinito visual */}
+                <div className={`marquee-wrapper ${isPaused ? 'paused-anim' : ''}`}>
                   {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
                     <div key={i} style={{ 
                         width: '300px', 
@@ -273,18 +293,17 @@ function LandingContent() {
                         scrollSnapAlign: 'center',
                         backgroundColor: '#fff'
                     }}>
-                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
                     </div>
                   ))}
                 </div>
               </div>
               <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>
-                ➔ Deslize para ver detalhes
+                {isPaused ? '➔ Arraste para navegar' : 'Clique ou toque para pausar'}
               </p>
             </div>
           )}
 
-          {/* DESCRIÇÃO PRE-WRAP */}
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
               {campaign?.description}
