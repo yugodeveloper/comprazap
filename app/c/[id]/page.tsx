@@ -33,6 +33,7 @@ function LandingContent() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0); // Estado para a bolinha ativa
 
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
@@ -45,7 +46,16 @@ function LandingContent() {
     }
   };
 
-  // NOVA LÓGICA: AUTOPLAY POR SLIDE (Não interfere na inércia do dedo)
+  // Lógica para detectar qual slide está ativo e atualizar a bolinha
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, clientWidth } = scrollRef.current;
+      const index = Math.round(scrollLeft / clientWidth);
+      setActiveIndex(index);
+    }
+  };
+
+  // Autoplay por Slide
   useEffect(() => {
     if (!campaign?.image_gallery || campaign.image_gallery.length <= 1 || isPaused) return;
 
@@ -59,7 +69,7 @@ function LandingContent() {
           behavior: 'smooth'
         });
       }
-    }, 5000); // Avança a cada 5 segundos
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [campaign, isPaused]);
@@ -100,23 +110,6 @@ function LandingContent() {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
-      });
-    } catch (err) { console.error(err); }
-  };
-
-  const enviarComprovanteTelegram = async (imageUrl: string, buyer: string, oId: string, total: number) => {
-    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    try {
-      await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId, photo: imageUrl,
-          caption: `🧐 *VALIDAR COMPROVANTE*\n👤 Cliente: ${buyer}\n💰 Valor: R$ ${total.toFixed(2)}\n\nAceita este pagamento?`,
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [[{ text: "✅ Aceitar", callback_data: `confirm_${oId}` }, { text: "❌ Recusar", callback_data: `reject_${oId}` }]] }
-        })
       });
     } catch (err) { console.error(err); }
   };
@@ -212,8 +205,6 @@ function LandingContent() {
     await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
     setOrderStatus('pending');
-    const total = itemsList.reduce((acc, curr) => acc + curr.total, 0);
-    await enviarComprovanteTelegram(publicUrl, buyerName, existingOrder.id, total);
     alert("Comprovante enviado! ✅");
     setUploading(false);
   };
@@ -237,7 +228,6 @@ function LandingContent() {
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
       <div style={containerStyle}>
         
-        {/* CAPA */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -245,7 +235,6 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* INFO BADGES */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -254,11 +243,11 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL PROFISSIONAL (IPHONE + ANDROID) */}
           {campaign?.image_gallery?.length > 0 && (
             <div style={{ marginBottom: 25, position: 'relative' }}>
               <div 
                 ref={scrollRef}
+                onScroll={handleScroll} // Detecta movimento para as bolinhas
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
                 onMouseEnter={() => setIsPaused(true)}
@@ -267,7 +256,7 @@ function LandingContent() {
                     display: 'flex', 
                     overflowX: 'auto', 
                     scrollSnapType: 'x mandatory', 
-                    WebkitOverflowScrolling: 'touch', // Habilita inércia no iPhone
+                    WebkitOverflowScrolling: 'touch',
                     scrollbarWidth: 'none',
                     borderRadius: '25px',
                     gap: 0, 
@@ -290,13 +279,26 @@ function LandingContent() {
                 ))}
               </div>
 
-              {/* SETAS DISCRETAS (Otimizado para Desktop) */}
+              {/* SETAS DISCRETAS */}
               <button onClick={() => navScroll('left')} style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>‹</button>
               <button onClick={() => navScroll('right')} style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>›</button>
 
-              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 15, textTransform: 'uppercase' }}>
-                ➔ Deslize para o lado
-              </p>
+              {/* BOLINHAS INDICADORAS (DINÂMICAS) */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 15 }}>
+                {campaign.image_gallery.map((_: any, i: number) => (
+                  <div 
+                    key={i} 
+                    style={{ 
+                        width: activeIndex === i ? 18 : 6, // Bolinha ativa fica compridinha
+                        height: 6, 
+                        borderRadius: '10px', 
+                        backgroundColor: '#059669', 
+                        opacity: activeIndex === i ? 1 : 0.2,
+                        transition: 'all 0.3s ease' // Suaviza a mudança da bolinha
+                    }}
+                  ></div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -341,7 +343,7 @@ function LandingContent() {
                         {pastOrders.map((order: any) => (
                           <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
                               <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
                             </div>
                           </div>
