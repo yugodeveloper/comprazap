@@ -50,7 +50,6 @@ function NovaCampanhaContent() {
           const prodData = camp.products;
           if (prodData) {
             const prod = Array.isArray(prodData) ? prodData[0] : prodData;
-            
             if (prod && prod.variations) {
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
@@ -58,7 +57,6 @@ function NovaCampanhaContent() {
               } else {
                 loadedVars = prod.variations;
               }
-
               if (Array.isArray(loadedVars) && loadedVars.length > 0) {
                 setVariations(loadedVars.map((v: any) => ({
                   name: String(v.name || ''),
@@ -134,18 +132,23 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
+      // --- MUDANÇA DE ESTRATÉGIA: DELETE + INSERT ---
+      // Esta sequência evita o erro de "USING expression" do UPSERT
+      await supabase.from('products').delete().eq('campaign_id', campId);
+      
       const { error: prodErr } = await supabase
         .from('products')
-        .upsert({
+        .insert({
           campaign_id: campId,
           variations: formattedVariations
-        }, { onConflict: 'campaign_id' });
+        });
 
       if (prodErr) throw prodErr;
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
+      console.error("Erro detalhado:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -157,7 +160,6 @@ function NovaCampanhaContent() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-        
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
