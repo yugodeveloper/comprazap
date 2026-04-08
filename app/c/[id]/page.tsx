@@ -31,30 +31,7 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [isUserInteracting, setIsUserInteracting] = useState(false);
-
-  // --- NOVA LÓGICA DO CARROSSEL: AUTO-SCROLL + ROLAGEM MANUAL ---
-  useEffect(() => {
-    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1) return;
-
-    const scrollInterval = setInterval(() => {
-      // Só move automaticamente se o usuário NÃO estiver tocando ou arrastando
-      if (carouselRef.current && !isUserInteracting) {
-        const { scrollLeft, clientWidth, scrollWidth } = carouselRef.current;
-        
-        // Se chegar no fim, volta pro começo (loop)
-        if (scrollLeft + clientWidth >= scrollWidth - 5) {
-          carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-        } else {
-          // Move um "passo" (uma largura de foto)
-          carouselRef.current.scrollBy({ left: clientWidth * 0.8, behavior: 'smooth' });
-        }
-      }
-    }, 4000); // Tenta mover a cada 4 segundos
-
-    return () => clearInterval(scrollInterval);
-  }, [campaign, isUserInteracting]);
+  const [isPaused, setIsPaused] = useState(false);
 
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
@@ -67,7 +44,6 @@ function LandingContent() {
     }
   };
 
-  // PERSISTÊNCIA DO CARRINHO
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
@@ -84,7 +60,6 @@ function LandingContent() {
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
 
-  // NOTIFICAÇÕES TELEGRAM
   const enviarNotificacaoTelegram = async (order: any, itens: any[]) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
@@ -231,6 +206,24 @@ function LandingContent() {
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
+      {/* CSS PARA O MARQUEE QUE PERMITE INTERAÇÃO */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .marquee-container {
+          display: flex;
+          width: max-content;
+        }
+        .marquee-active {
+          animation: marquee 30s linear infinite;
+        }
+        .marquee-paused {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       <div style={containerStyle}>
         
         {/* HEADER */}
@@ -250,35 +243,35 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
-          {/* CARROSSEL MELHORADO: AUTO-SCROLL + ARRASTE MANUAL */}
+          {/* CARROSSEL HÍBRIDO (MARQUEE + SCROLL MANUAL) */}
           {campaign?.image_gallery?.length > 0 && (
-            <div style={{ marginBottom: 25 }}>
+            <div 
+              style={{ marginBottom: 25, overflow: 'hidden', borderRadius: '20px', position: 'relative' }}
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
+              onTouchStart={() => setIsPaused(true)}
+              onTouchEnd={() => setIsPaused(false)}
+            >
               <div 
-                ref={carouselRef}
-                onMouseDown={() => setIsUserInteracting(true)}
-                onMouseUp={() => setIsUserInteracting(false)}
-                onTouchStart={() => setIsUserInteracting(true)}
-                onTouchEnd={() => setIsUserInteracting(false)}
                 style={{ 
-                    display: 'flex', 
-                    overflowX: 'auto', 
-                    scrollSnapType: 'x mandatory', 
-                    scrollbarWidth: 'none', 
-                    gap: 12,
-                    cursor: 'grab',
-                    WebkitOverflowScrolling: 'touch' // Garante rolagem fluida no iOS
+                  display: 'flex', 
+                  overflowX: isPaused ? 'auto' : 'hidden', 
+                  scrollSnapType: isPaused ? 'x mandatory' : 'none',
+                  WebkitOverflowScrolling: 'touch'
                 }}
               >
-                {campaign.image_gallery.map((img: string, i: number) => (
-                  <div key={i} style={{ minWidth: '85%', height: '380px', scrollSnapAlign: 'center', borderRadius: '25px', overflow: 'hidden', backgroundColor: '#f1f5f9', position: 'relative', flexShrink: 0 }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: 900 }}>
-                       {i+1} / {campaign.image_gallery.length}
+                <div className={`marquee-container ${!isPaused ? 'marquee-active' : ''}`}>
+                  {/* Duplicamos os itens para o loop infinito visual */}
+                  {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
+                    <div key={i} style={{ minWidth: '280px', height: '380px', marginRight: '12px', borderRadius: '20px', overflow: 'hidden', flexShrink: 0, scrollSnapAlign: 'center' }}>
+                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-              <p style={{ textAlign: 'center', fontSize: '9px', color: '#94a3b8', fontWeight: 900, marginTop: 12, textTransform: 'uppercase', letterSpacing: '1px' }}>➔ Deslize para ver detalhes</p>
+              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>
+                {isPaused ? '➔ Deslize para navegar' : 'Toque para pausar'}
+              </p>
             </div>
           )}
 
@@ -292,7 +285,7 @@ function LandingContent() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
               {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
           </div>
@@ -317,7 +310,7 @@ function LandingContent() {
                </div>
                {pastOrders.length > 0 && (
                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', marginTop: 10, paddingTop: 10 }}>
-                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
+                    <button onClick={() => setShowHistory(!showHistory)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '10px', fontWeight: 900, padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>🛒 Pedidos anteriores ({pastOrders.length}) {showHistory ? '▲' : '▼'}</button>
                     {showHistory && (
                       <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {pastOrders.map((order: any) => (
