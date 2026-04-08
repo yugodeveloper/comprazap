@@ -132,8 +132,7 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // --- AQUI MUDA A ESTRATÉGIA: CHAMADA DE FUNÇÃO RPC ---
-      // Invocamos a função do banco que ignora as travas de RLS do front-end
+      // CHAMADA RPC ATUALIZADA: Agora faz UPDATE ou INSERT sem apagar a linha
       const { error: rpcErr } = await supabase.rpc('save_campaign_products', {
         target_campaign_id: campId,
         new_variations: formattedVariations
