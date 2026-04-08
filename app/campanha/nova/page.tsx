@@ -49,7 +49,6 @@ function NovaCampanhaContent() {
           
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
-            // BLINDAGEM: Garante que variações sejam lidas corretamente como array
             let loadedVars = [];
             if (Array.isArray(prod.variations)) {
               loadedVars = prod.variations;
@@ -119,10 +118,9 @@ function NovaCampanhaContent() {
         const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
         if (campErr) throw campErr;
       } else {
-        // CORREÇÃO: .select().single() adicionado para o ID não vir nulo
         const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
         if (campErr) throw campErr;
-        if (!camp) throw new Error("Erro ao criar campanha no banco.");
+        if (!camp) throw new Error("Erro ao criar campanha.");
         campId = camp.id;
       }
 
@@ -133,7 +131,7 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      // LÓGICA DE SALVAMENTO DE PRODUTOS
+      // LÓGICA DE SALVAMENTO DE PRODUTOS (Apenas Variations JSONB)
       await supabase.from('products').delete().eq('campaign_id', campId);
       const { error: prodErr } = await supabase.from('products').insert({
         campaign_id: campId,
@@ -180,7 +178,7 @@ function NovaCampanhaContent() {
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
