@@ -45,7 +45,7 @@ function NovaCampanhaContent() {
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
             const loadedVars = Array.isArray(prod.variations) ? prod.variations : [];
-            setVariations(loadedVars.map((v: any) => ({ name: v.name, price: v.price.toString() })));
+            setVariations(loadedVars.length > 0 ? loadedVars.map((v: any) => ({ name: v.name, price: v.price.toString() })) : [{ name: '', price: '' }]);
           }
         }
       }
@@ -101,21 +101,24 @@ function NovaCampanhaContent() {
         campId = camp.id;
       }
 
-      const formattedVariations = variations.map(v => ({
-        name: v.name, price: parseFloat(v.price.toString().replace(',', '.'))
-      }))
+      const formattedVariations = variations
+        .filter(v => v.name && v.price)
+        .map(v => ({
+          name: v.name, 
+          price: parseFloat(v.price.toString().replace(',', '.'))
+        }));
 
-      // LÓGICA INFALÍVEL PARA PRODUTOS: Deleta e insere novamente.
+      // Lógica de salvamento robusta: Limpa e reinsere
       await supabase.from('products').delete().eq('campaign_id', campId);
       await supabase.from('products').insert({
         campaign_id: campId,
         name: title,
-        price: formattedVariations[0].price,
+        price: formattedVariations[0]?.price || 0,
         variations: formattedVariations
       });
 
       alert("Campanha salva com sucesso! 🚀");
-      window.location.href = '/'; 
+      router.push('/');
     } catch (err: any) { alert("Erro ao salvar: " + err.message); } 
     finally { setLoading(false); }
   }
@@ -136,7 +139,7 @@ function NovaCampanhaContent() {
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Capa da Página</label>
               <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', position: 'relative' }}>
                 {headerImg ? (
-                  <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer' }}>✕</button></>
+                  <><img src={headerImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" onClick={() => setHeaderImg('')} style={{ position: 'absolute', top: 5, right: 5, background: 'black', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} /><span style={{ fontSize: '10px', color: '#94a3b8' }}>+ Capa</span>
@@ -148,7 +151,7 @@ function NovaCampanhaContent() {
               <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Foto WhatsApp</label>
               <div style={{ marginTop: '5px', height: '120px', backgroundColor: 'white', borderRadius: '10px', border: '2px dashed #059669', overflow: 'hidden', position: 'relative', padding: '5px' }}>
                 {shareImg ? (
-                  <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer' }}>✕</button></>
+                  <><img src={shareImg} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /><button type="button" onClick={() => setShareImg('')} style={{ position: 'absolute', top: 2, right: 2, background: '#059669', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button></>
                 ) : (
                   <label style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
                     <input type="file" hidden onChange={(e) => handleUpload(e, 'share')} /><span style={{ fontSize: '18px' }}>📸</span><span style={{ fontSize: '8px', color: '#059669', fontWeight: 'bold' }}>POLAROID</span>

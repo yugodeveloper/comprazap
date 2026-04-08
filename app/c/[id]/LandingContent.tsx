@@ -170,12 +170,16 @@ export default function LandingContent({ initialCampaign, id }: { initialCampaig
 
   async function fetchData() {
     try {
+      if (!campaign) {
+        const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single();
+        setCampaign(cp);
+      }
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
       if (pd && pd.variations && typeof pd.variations === 'string') {
           pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
       }
       setProduct(pd);
-      const { data: sl } = await supabase.from('profiles').select('*').eq('id', campaign?.creator_id).single();
+      const { data: sl } = await supabase.from('profiles').select('*').eq('id', initialCampaign?.creator_id || campaign?.creator_id).single();
       setSeller(sl);
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
       setTotalBuyers(count || 0);

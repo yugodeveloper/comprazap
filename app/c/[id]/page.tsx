@@ -7,7 +7,6 @@ type Props = {
   params: { id: string }
 }
 
-// ESTA FUNÇÃO É O QUE O WHATSAPP LÊ
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { data: cp } = await supabase.from('campaigns').select('*').eq('id', params.id).single();
 
@@ -26,17 +25,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       }],
       type: 'website',
     },
-    twitter: {
-      card: 'summary_large_image',
-      title: cp.title,
-      description: cp.description?.substring(0, 160),
-      images: [cp.share_image || cp.image_url || ''],
-    }
   }
 }
 
 export default async function LandingPage({ params }: Props) {
-  // Busca os dados iniciais da campanha no servidor para passar para o cliente
   const { data: cp } = await supabase.from('campaigns').select('*').eq('id', params.id).single();
   
   return (
