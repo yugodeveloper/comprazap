@@ -1,54 +1,46 @@
-# 🛒 CompraZap - Manifesto do Projeto v19.0
+# 🛒 CompraZap - Manifesto do Projeto v20.0 (Atualizado 07/04)
 
 ## 📌 Visão Geral
-Plataforma de micro-vendas para condomínios. Foco em UX mobile-first, automação via Telegram e **vitrine dinâmica de alta conversão** para produtos artesanais (Cucas).
+Plataforma de micro-vendas para condomínios. Foco em UX mobile-first e checkout sem fricção. Atualmente otimizada para a venda de cucas artesanais no Condomínio Lanai.
 
 ---
 
-## 🏗️ Arquitetura Técnica
-- **Frontend:** Next.js 16.2.1 (App Router).
-- **Backend:** Supabase (Auth + Storage + DB).
-- **UX Dinâmica:** Marquee CSS para carrossel infinito e fallback inteligente de imagens de capa.
-- **Auto-Login:** Bypass via `?w=phone` com wrapper `<Suspense>`.
+## 📂 Novas Implementações (07/04)
+
+### 1. Sistema de Edição Total
+- **Botão Editar:** Integrado ao card de cada campanha no Portal Principal (`app/page.tsx`).
+- **Persistência Explícita:** Correção de políticas RLS no Supabase para permitir `UPDATE` pelo criador da campanha via SQL Editor.
+- **Limpeza de Mídia:** Lógica para envio de `null` ao banco ao excluir fotos de capa ou galeria, garantindo a atualização real dos dados e remoção de imagens indesejadas.
+
+### 2. Vitrine Híbrida (Carrossel 3.0)
+- **Modo Marquee:** Movimento automático contínuo para atrair o olhar do comprador.
+- **Interação Mobile (iOS/Android):** Implementação de Scroll Snap com inércia nativa (`WebkitOverflowScrolling: touch`).
+- **Interação Desktop:** Sistema de "Mouse Drag" (clicar e arrastar) para permitir navegação intuitiva com o mouse.
+- **Visual:** Ajuste para `object-fit: contain` em fundo branco, garantindo que informações em fotos verticais não sejam cortadas.
+
+### 3. Localização e Formatos
+- **Data Brasileira:** Substituição do input nativo por campo de texto com máscara `dd/mm/aaaa`.
+- **Conversão Automática:** Tratamento no front-end para salvar como ISO no banco e exibir como PT-BR no app.
 
 ---
 
-## 📂 Estrutura de Dados (Atualizada)
-| Tabela | Campo / Status | Descrição |
-| :--- | :--- | :--- |
-| **campaigns** | `image_url` | Imagem de capa (Header). |
-| **campaigns** | `image_gallery` | Array JSONB com até 5 fotos para o carrossel. |
-| **orders** | `status` | `pending`, `paid`, `rejected`, `cancelled`. |
+## 🛠️ Log de Batalhas & Correções
+- **Bug de Permissão (RLS):** Resolvido com a criação da política de segurança no Postgres para liberar o comando `UPDATE`.
+- **Sincronização de Produtos:** Agora, ao editar a Campanha, o registro correspondente na tabela `products` é atualizado simultaneamente via `upsert`.
+- **Cache do Navegador:** Implementado `window.location.href = '/'` após o salvamento para forçar o recarregamento total da lista de campanhas.
 
 ---
 
-## ✅ Fluxo de UX Implementado (v19.0)
-
-### 1. Experiência do Comprador (`/c/[id]`)
-- **Vitrine Automática:** Carrossel de fotos do produto desliza sozinho (Marquee) para chamar atenção.
-- **Fallback Inteligente:** Se o vendedor não subir uma capa, o app usa a primeira foto da galeria como header.
-- **Texto Formatado:** Descrições preservam quebras de linha (`pre-wrap`) para listas de preços.
-- **Check-out de Segurança:** Persistência de carrinho via `localStorage` e resumo visual antes do PIX.
-
-### 2. Painel do Morador (`/`)
-- **Gestão de Campanhas:** Lista completa com métricas reais e selos de alerta de PIX.
-- **Edição em Tempo Real:** Botão **"EDITAR ✏️"** que carrega dados existentes para ajustes rápidos sem mudar o link.
-- **Social Condomínio:** Seção "Minhas Compras" para acompanhar pedidos feitos a outros vizinhos.
+## 🚀 Próximos Passos (Amanhã)
+1.  **Ajuste Fino do Carrossel:** Corrigir os "saltos" visuais ao entrar/sair do modo de pausa no desktop.
+2.  **Card do WhatsApp 2.0:**
+    - Criar um design de texto mais "copywriter" para conversão.
+    - Implementar Meta Tags dinâmicas (OpenGraph) para que a foto da cuca apareça na prévia do link do WhatsApp.
+3.  **Localização:** Iniciar seletor de condomínios para expansão além do Lanai.
 
 ---
 
-## 🛠️ Log de Batalhas & Soluções (Últimas Evoluções)
-- **Bug de Looping:** Implementado efeito Marquee CSS puro para evitar dependências de bibliotecas de terceiros no mobile.
-- **Recuperação de Edição:** Ajustada a lógica de `upsert` na criação de ofertas para diferenciar `insert` de `update` baseado no ID da URL.
-
----
-
-## 🚀 Próximos Passos
-- [ ] **Filtro por Condomínio:** Preparar o cadastro para multi-condomínios.
-- [ ] **Persistência Local Total:** Garantir que dados de identificação (nome/apto) não sumam no refresh.
-
----
-
-## 🔗 Links e Credenciais
+## 🔗 Atalhos Rápidos
 - **Bot Telegram:** `@8625189600` (CompraZap Alertas)
-- **Bucket Storage:** `comprovantes` (usado para recibos e fotos de produtos).
+- **Principais Tabelas:** `campaigns` / `products` / `orders`
+- **Deploy:** `git add .` -> `git commit -m "..."` -> `git push`

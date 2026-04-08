@@ -31,11 +31,12 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  const [isPaused, setIsPaused] = useState(false);
+  // Referências para o Carrossel Nativo
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
 
   const maskPhone = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
@@ -47,6 +48,26 @@ function LandingContent() {
       alert("Chave Pix copiada! ✅");
     }
   };
+
+  // Lógica de Auto-play (Avança um slide por vez)
+  useEffect(() => {
+    if (!campaign?.image_gallery || campaign.image_gallery.length <= 1 || !isAutoScrolling) return;
+
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
+        const maxScroll = scrollWidth - clientWidth;
+        
+        if (scrollLeft >= maxScroll - 10) {
+          scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
+        }
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [campaign, isAutoScrolling]);
 
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${id}`);
@@ -193,24 +214,21 @@ function LandingContent() {
     setUploading(false);
   };
 
-  // Funções para Mouse Drag (Desktop)
+  // Funções de Arrastar Mouse (Desktop)
   const onMouseDown = (e: React.MouseEvent) => {
-    setIsPaused(true);
+    setIsAutoScrolling(false);
     setIsDragging(true);
     setStartX(e.pageX - (scrollRef.current?.offsetLeft || 0));
-    setScrollLeft(scrollRef.current?.scrollLeft || 0);
+    setScrollLeftState(scrollRef.current?.scrollLeft || 0);
   };
-  const onMouseLeave = () => {
-    setIsDragging(false);
-    setIsPaused(false);
-  };
+  const onMouseLeave = () => setIsDragging(false);
   const onMouseUp = () => setIsDragging(false);
   const onMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !scrollRef.current) return;
     e.preventDefault();
     const x = e.pageX - (scrollRef.current.offsetLeft || 0);
-    const walk = (x - startX) * 2;
-    scrollRef.current.scrollLeft = scrollLeft - walk;
+    const walk = (x - startX) * 1.5;
+    scrollRef.current.scrollLeft = scrollLeftState - walk;
   };
 
   const InfoBadge = ({label, value}: {label: string, value: string}) => (
@@ -230,23 +248,9 @@ function LandingContent() {
 
   return (
     <div style={{ backgroundColor: '#fafaf9', minHeight: '100vh' }}>
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .marquee-wrapper {
-          display: flex;
-          width: max-content;
-          animation: marquee 40s linear infinite;
-        }
-        .paused-anim {
-          animation-play-state: paused !important;
-        }
-      `}</style>
-
       <div style={containerStyle}>
         
+        {/* HEADER (Capa) */}
         <div style={{ height: '140px', backgroundColor: '#eee', position: 'relative', overflow: 'hidden' }}>
           {headerImage && <img src={headerImage} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '15px 20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
@@ -254,6 +258,7 @@ function LandingContent() {
           </div>
         </div>
 
+        {/* DADOS RÁPIDOS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
           <InfoBadge label="Local" value="Cond. Lanai" />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
@@ -262,6 +267,7 @@ function LandingContent() {
 
         <div style={{ padding: '15px 20px' }}>
           
+          {/* CARROSSEL NATIVO (Otimizado para iPhone e Desktop) */}
           {campaign?.image_gallery?.length > 0 && (
             <div style={{ marginBottom: 25 }}>
               <div 
@@ -270,54 +276,63 @@ function LandingContent() {
                 onMouseLeave={onMouseLeave}
                 onMouseUp={onMouseUp}
                 onMouseMove={onMouseMove}
-                onTouchStart={() => setIsPaused(true)}
-                onTouchEnd={() => setIsPaused(false)}
+                onTouchStart={() => setIsAutoScrolling(false)}
                 style={{ 
-                    overflowX: isPaused ? 'auto' : 'hidden', 
-                    borderRadius: '20px',
-                    WebkitOverflowScrolling: 'touch',
-                    scrollSnapType: isPaused ? 'x mandatory' : 'none',
+                    display: 'flex', 
+                    overflowX: 'auto', 
+                    scrollSnapType: 'x mandatory', 
+                    WebkitOverflowScrolling: 'touch', // Habilita inércia elástica no iPhone
                     scrollbarWidth: 'none',
+                    borderRadius: '25px',
+                    gap: 0,
                     cursor: isDragging ? 'grabbing' : 'grab'
                 }}
               >
-                <div className={`marquee-wrapper ${isPaused ? 'paused-anim' : ''}`}>
-                  {[...campaign.image_gallery, ...campaign.image_gallery].map((img: string, i: number) => (
-                    <div key={i} style={{ 
-                        width: '300px', 
-                        height: '400px', 
-                        marginRight: '12px', 
-                        borderRadius: '20px', 
-                        overflow: 'hidden', 
-                        flexShrink: 0, 
-                        scrollSnapAlign: 'center',
-                        backgroundColor: '#fff'
-                    }}>
-                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
-                    </div>
-                  ))}
-                </div>
+                {campaign.image_gallery.map((img: string, i: number) => (
+                  <div key={i} style={{ 
+                      minWidth: '100%', 
+                      height: '400px', 
+                      scrollSnapAlign: 'center', 
+                      flexShrink: 0, 
+                      backgroundColor: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                  }}>
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
+                  </div>
+                ))}
               </div>
-              <p style={{ textAlign: 'center', fontSize: '8px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase' }}>
-                {isPaused ? '➔ Arraste para navegar' : 'Clique ou toque para pausar'}
+              
+              {/* Indicadores Visuais (Bolinhas) */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 15 }}>
+                {campaign.image_gallery.map((_: any, i: number) => (
+                  <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#059669', opacity: 0.2 }}></div>
+                ))}
+              </div>
+              <p style={{ textAlign: 'center', fontSize: '9px', color: '#94a3b8', fontWeight: 900, marginTop: 10, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                ➔ Deslize para o lado
               </p>
             </div>
           )}
 
+          {/* DESCRIÇÃO PRE-WRAP */}
           <div style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20 }}>
             <p style={{ color: '#475569', fontSize: 13, lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
               {campaign?.description}
             </p>
           </div>
 
+          {/* VENDEDOR */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 15, marginBottom: 25 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#059669', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{seller?.full_name?.charAt(0)}</div>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Vendedor: {seller?.full_name?.split(' ')[0]}</span>
               </div>
               {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>DÚVIDAS? 📱</a>}
           </div>
 
+          {/* FLUXO DE IDENTIFICAÇÃO */}
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Qual seu WhatsApp?</h3>
@@ -326,6 +341,7 @@ function LandingContent() {
             </div>
           )}
 
+          {/* BADGE DE USUÁRIO E HISTÓRICO */}
           {step !== 'identificacao' && (
             <div style={{ backgroundColor: '#059669', color: 'white', padding: '12px 15px', borderRadius: '15px', marginBottom: '20px' }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -344,7 +360,7 @@ function LandingContent() {
                         {pastOrders.map((order: any) => (
                           <div key={order.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '8px', borderRadius: '10px', fontSize: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
                               <span style={{ fontWeight: 900 }}>R$ {order.selected_variations?.reduce((acc:any, curr:any) => acc + curr.total, 0).toFixed(2)}</span>
                             </div>
                           </div>
@@ -356,6 +372,7 @@ function LandingContent() {
             </div>
           )}
 
+          {/* SELEÇÃO DE ITENS */}
           {step === 'itens' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
               <div style={{ background: 'white', padding: 15, borderRadius: 20, border: '1px solid #eee' }}>
@@ -385,6 +402,7 @@ function LandingContent() {
             </div>
           )}
 
+          {/* DADOS DE ENTREGA */}
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Pedido</button>
@@ -408,6 +426,7 @@ function LandingContent() {
             </div>
           )}
 
+          {/* TELA DE PAGAMENTO (PIX) */}
           {step === 'concluido' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ background: orderStatus === 'paid' ? '#dcfce7' : '#f1f5f9', color: orderStatus === 'paid' ? '#166534' : '#444', padding: 12, borderRadius: 15, marginBottom: 15, fontWeight: 'bold' }}>
