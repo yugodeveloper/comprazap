@@ -132,15 +132,11 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // LÓGICA ATÔMICA: Upsert forçando o conflito no campaign_id
-      // O Supabase resolverá internamente se deleta/insere ou atualiza
+      // LÓGICA ATÔMICA DE UPSERT
       const { error: prodErr } = await supabase
         .from('products')
         .upsert(
-          { 
-            campaign_id: campId, 
-            variations: formattedVariations 
-          }, 
+          { campaign_id: campId, variations: formattedVariations }, 
           { onConflict: 'campaign_id' }
         );
 
