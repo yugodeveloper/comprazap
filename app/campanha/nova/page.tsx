@@ -50,6 +50,7 @@ function NovaCampanhaContent() {
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
             let loadedVars = [];
+            
             if (Array.isArray(prod.variations)) {
               loadedVars = prod.variations;
             } else if (typeof prod.variations === 'string') {
@@ -57,7 +58,7 @@ function NovaCampanhaContent() {
             }
             
             if (loadedVars.length > 0) {
-              // CORREÇÃO: Forçando o mapeamento para garantir que o React renderize a lista
+              // Limpa o estado inicial antes de carregar os do banco
               setVariations(loadedVars.map((v: any) => ({ 
                 name: v.name, 
                 price: v.price.toString() 

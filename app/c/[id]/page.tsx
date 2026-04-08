@@ -314,7 +314,7 @@ function LandingContent() {
               >
                 {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ minWidth: '100%', width: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
                   </div>
                 ))}
               </div>
@@ -354,7 +354,7 @@ function LandingContent() {
                       <p style={{margin: 0, opacity: 0.8}}>{buyerApto ? `Unidade ${buyerApto}` : 'Identificando...'}</p>
                       <p style={{margin: '2px 0 0 0', fontWeight: 900, fontSize: '10px'}}>{contact}</p>
                   </div>
-                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: 900, padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
+                  <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '9px', fontWeight: '900', padding: '5px 10px', borderRadius: '50px', cursor: 'pointer' }}>ALTERAR</button>
                </div>
                
                {pastOrders.length > 0 && (
