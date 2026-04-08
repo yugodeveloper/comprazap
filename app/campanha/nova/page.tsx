@@ -22,9 +22,7 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
   
-  // PERSISTÊNCIA DO ID DO PRODUTO PARA RESOLVER O ERRO DE RLS NO UPDATE
   const [existingProductId, setExistingProductId] = useState<string | null>(null)
-  const [debugData, setDebugData] = useState<any>(null)
 
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
@@ -40,7 +38,6 @@ function NovaCampanhaContent() {
           .single();
 
         if (camp && !error) {
-          setDebugData(camp.products); 
           setTitle(camp.title || '');
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
@@ -52,21 +49,16 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          const prodData = camp.products;
-          if (prodData) {
-            const prod = Array.isArray(prodData) ? prodData[0] : prodData;
-            
+          if (camp.products) {
+            const prod = Array.isArray(camp.products) ? camp.products[0] : camp.products;
             if (prod) {
-              // GUARDA O ID PARA O UPSERT SABER QUE É UMA EDIÇÃO
               setExistingProductId(prod.id);
-              
               let loadedVars = [];
               if (typeof prod.variations === 'string') {
                 try { loadedVars = JSON.parse(prod.variations); } catch(e) { loadedVars = []; }
               } else {
                 loadedVars = prod.variations;
               }
-
               if (Array.isArray(loadedVars) && loadedVars.length > 0) {
                 setVariations(loadedVars.map((v: any) => ({
                   name: String(v.name || ''),
@@ -115,8 +107,6 @@ function NovaCampanhaContent() {
     setLoading(true)
     try {
       const userId = localStorage.getItem('user_id')
-      if (!userId) throw new Error("Usuário não identificado.");
-
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
@@ -142,26 +132,27 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // MONTAGEM DO PAYLOAD DO PRODUTO: SE HOUVER ID, O SUPABASE FAZ O UPDATE CORRETAMENTE
-      const productPayload: any = {
-        campaign_id: campId,
-        variations: formattedVariations
-      };
-
-      if (existingProductId) {
-        productPayload.id = existingProductId;
-      }
-
-      const { error: prodErr } = await supabase
+      // --- ESTRATÉGIA DE SALVAMENTO ALTERNATIVA (MANUAL) ---
+      // Tentamos atualizar pelo campaign_id. Se o retorno for vazio, inserimos.
+      const { data: updateData, error: upError } = await supabase
         .from('products')
-        .upsert(productPayload, { onConflict: 'campaign_id' });
+        .update({ variations: formattedVariations })
+        .eq('campaign_id', campId)
+        .select();
 
-      if (prodErr) throw prodErr;
+      if (upError || !updateData || updateData.length === 0) {
+        // Se não conseguiu dar update, tenta o insert
+        const { error: insError } = await supabase
+          .from('products')
+          .insert({ campaign_id: campId, variations: formattedVariations });
+          
+        if (insError) throw insError;
+      }
 
       alert("Campanha salva com sucesso! 🚀");
       window.location.href = '/';
     } catch (err: any) { 
-      console.error("Erro detalhado:", err);
+      console.error("Erro no salvamento:", err);
       alert("Erro ao salvar: " + err.message); 
     } finally { 
       setLoading(false); 
@@ -173,7 +164,6 @@ function NovaCampanhaContent() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-        
         <header style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h1 style={{ fontSize: '18px', fontWeight: '900', fontStyle: 'italic', margin: 0 }}>{editId ? 'Editar Campanha' : 'Nova Campanha'} 🥧</h1>
@@ -228,9 +218,7 @@ function NovaCampanhaContent() {
                 <label style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', marginBottom: '5px', display: 'block' }}>PEDIDOS ATÉ</label>
                 <div style={{ position: 'relative' }}>
                   <input placeholder="dd/mm/aaaa" required style={inputStyle} value={expiresAt} onChange={e => setExpiresAt(maskDate(e.target.value))} />
-                  <input 
-                    type="date" 
-                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
+                  <input type="date" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', width: '24px', opacity: 0.5 }} 
                     onChange={e => {
                       const date = new Date(e.target.value + 'T00:00:00');
                       setExpiresAt(date.toLocaleDateString('pt-BR'));
