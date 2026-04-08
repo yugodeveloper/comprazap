@@ -71,7 +71,10 @@ function LandingContent() {
   useEffect(() => {
     if (gallery.length <= 1 || isPaused) return;
     const interval = setInterval(() => {
-      if (scrollRef.current) { scrollRef.current.scrollBy({ left: scrollRef.current.clientWidth, behavior: 'smooth' }); }
+      if (scrollRef.current) {
+        const { clientWidth } = scrollRef.current;
+        scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
+      }
     }, 5000);
     return () => clearInterval(interval);
   }, [gallery, isPaused]);
@@ -94,7 +97,7 @@ function LandingContent() {
   }, [itemsList, id]);
 
   const handleLogout = () => {
-    if(!confirm("Deseja alterar o usuário ou fazer novo pedido?")) return;
+    if(!confirm("Deseja alterar o usuário ou fazer outro pedido?")) return;
     localStorage.removeItem(`cart_${id}`);
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
@@ -106,8 +109,8 @@ function LandingContent() {
     if (!token || !chatId) return;
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');
     const total = itens.reduce((acc, curr) => acc + curr.total, 0);
-    const obsText = order.observations ? `\n📝 *Obs:* ${order.observations}` : '';
-    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsText}`;
+    const obsPart = order.observations ? `\n📝 *Obs:* ${order.observations}` : '';
+    const msg = `🛒 *NOVO PEDIDO!*\n📦 *Campanha:* ${campaign?.title}\n👤 *Cliente:* ${order.buyer_name}\n🏠 *Apto:* ${order.buyer_apto}\n🔢 *Itens:* ${itensMsg}\n💵 *Total:* R$ ${total.toFixed(2)}\n📱 *WhatsApp:* ${order.buyer_contact}${obsPart}`;
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -127,7 +130,7 @@ function LandingContent() {
         if (pending) {
           setExistingOrder(pending); setOrderStatus(pending.status); setObservations(pending.observations || '');
           setBuyerName(pending.buyer_name || ''); setBuyerApto(pending.buyer_apto || '');
-          setItemsList(pending.selected_variations); setStep('concluido');
+          setItemsList(pending.selected_variations || []); setStep('concluido');
           setLoading(false); return;
         }
       }
@@ -162,10 +165,14 @@ function LandingContent() {
       if (!cp) return;
       setCampaign(cp);
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
-      if (pd && pd.variations && typeof pd.variations === 'string') {
-          pd.variations = pd.variations.split(',').map((v: string) => ({ name: v.trim(), price: pd.price || 0 }));
+      
+      let finalVariations = [];
+      if (pd) {
+          if (Array.isArray(pd.variations)) finalVariations = pd.variations;
+          else if (typeof pd.variations === 'string') finalVariations = JSON.parse(pd.variations);
       }
-      setProduct(pd);
+      setProduct({ ...pd, variations: finalVariations });
+      
       const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
       setSeller(sl);
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
@@ -192,7 +199,7 @@ function LandingContent() {
   };
 
   const handleRemoveReceipt = async () => {
-    if(!confirm("Remover este comprovante?")) return;
+    if(!confirm("Remover este comprovante e enviar outro?")) return;
     setUploading(true);
     await supabase.from('orders').update({ receipt_url: null }).eq('id', existingOrder.id);
     setExistingOrder((prev: any) => ({ ...prev, receipt_url: null }));
@@ -224,7 +231,7 @@ function LandingContent() {
   const btnStyle: React.CSSProperties = { width: '100%', padding: '18px', borderRadius: '50px', backgroundColor: '#059669', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer', marginTop: '10px' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', borderRadius: '15px', border: '1px solid #ddd', marginBottom: '10px', boxSizing: 'border-box', textAlign: 'center', fontSize: '16px' };
 
-  if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando...</div>
+  if (loading && !autoPhone) return <div style={{textAlign:'center', marginTop:100, fontWeight:'bold', color: '#059669'}}>Carregando Oferta...</div>
 
   const headerImage = campaign?.image_url || (campaign?.image_gallery?.length > 0 ? campaign.image_gallery[0] : null);
 

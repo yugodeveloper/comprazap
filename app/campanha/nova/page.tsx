@@ -49,7 +49,6 @@ function NovaCampanhaContent() {
           
           if (camp.products && camp.products.length > 0) {
             const prod = camp.products[0];
-            // BLINDAGEM: Garante que variações sejam lidas corretamente como array
             let loadedVars = [];
             if (Array.isArray(prod.variations)) {
               loadedVars = prod.variations;
@@ -88,7 +87,10 @@ function NovaCampanhaContent() {
   }
 
   const addVariation = () => setVariations([...variations, { name: '', price: '' }])
-  const removeVariation = (index: number) => setVariations(variations.filter((_, i) => i !== index))
+  const removeVariation = (index: number) => {
+    if (variations.length === 1) return alert("A campanha precisa de ao menos um item.");
+    setVariations(variations.filter((_, i) => i !== index));
+  }
   const updateVariation = (index: number, field: 'name' | 'price', value: string) => {
     const newVars = [...variations];
     (newVars[index] as any)[field] = value;
@@ -124,7 +126,7 @@ function NovaCampanhaContent() {
           price: parseFloat(v.price.toString().replace(',', '.'))
         }));
 
-      // REFORÇO NO SALVAMENTO
+      // LÓGICA DE SALVAMENTO REFORÇADA
       await supabase.from('products').delete().eq('campaign_id', campId);
       const { error: prodErr } = await supabase.from('products').insert({
         campaign_id: campId,
@@ -137,7 +139,7 @@ function NovaCampanhaContent() {
 
       alert("Campanha salva com sucesso! 🚀");
       router.push('/');
-      setTimeout(() => window.location.reload(), 500); // Garante limpeza de cache
+      setTimeout(() => window.location.reload(), 500);
     } catch (err: any) { 
       alert("Erro ao salvar: " + err.message); 
     } finally { 
@@ -209,7 +211,7 @@ function NovaCampanhaContent() {
                 <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                     <input placeholder="Item" required style={{ ...inputStyle, padding: '10px' }} value={v.name} onChange={e => updateVariation(index, 'name', e.target.value)} />
                     <input placeholder="R$" required style={{ ...inputStyle, padding: '10px', width: '80px' }} value={v.price} onChange={e => updateVariation(index, 'price', e.target.value)} />
-                    {variations.length > 1 && <button type="button" onClick={() => removeVariation(index)} style={{ border: 'none', background: 'none', color: '#f87171' }}>✕</button>}
+                    <button type="button" onClick={() => removeVariation(index)} style={{ border: 'none', background: 'none', color: '#f87171' }}>✕</button>
                 </div>
             ))}
             <button type="button" onClick={addVariation} style={{ width: '100%', padding: '8px', border: 'none', background: '#f1f5f9', borderRadius: '10px', fontSize: '10px', fontWeight: '900' }}>+ ADICIONAR ITEM</button>
