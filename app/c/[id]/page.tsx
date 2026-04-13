@@ -31,16 +31,15 @@ function LandingContent() {
   const [tempSelection, setTempSelection] = useState<any>(null)
   const [tempQty, setTempQty] = useState(1)
 
-  // Paleta de cores pastéis para os botões de itens
+  // Paleta de cores pastéis para os botões de itens (tons suaves que não conflitam com o verde)
   const pastelColors = [
-    '#fef2f2', // Vermelho/Rosa suave
-    '#fff7ed', // Laranja suave
-    '#fefce8', // Amarelo suave
-    '#f0fdf4', // Verde suave
-    '#eff6ff', // Azul suave
-    '#faf5ff', // Roxo suave
-    '#fdf2f8', // Rosa suave
-    '#f8fafc', // Cinza azulado suave
+    '#F0F4FF', // Azul pastel
+    '#FFF1F2', // Rosa suave
+    '#FEFCE8', // Amarelo palha
+    '#F5F3FF', // Lavanda
+    '#F0FDFA', // Turquesa claro
+    '#FFF7ED', // Laranja suave
+    '#F8FAFC', // Cinza azulado
   ];
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -401,14 +400,15 @@ function LandingContent() {
                       style={{ 
                         padding: '10px 15px', 
                         borderRadius: '12px', 
-                        border: tempSelection?.name === v.name ? '2px solid #059669' : '1px solid #ddd', 
+                        border: tempSelection?.name === v.name ? '2px solid #059669' : '1px solid #e2e8f0', 
                         fontSize: '12px', 
                         fontWeight: 'bold', 
-                        // Aplicação da cor pastel aleatória baseada no index
+                        // Fundo Pastel dinâmico ou Verde se selecionado
                         backgroundColor: tempSelection?.name === v.name ? '#059669' : pastelColors[index % pastelColors.length], 
-                        color: tempSelection?.name === v.name ? 'white' : '#444',
+                        color: tempSelection?.name === v.name ? 'white' : '#475569',
                         transition: 'all 0.2s ease',
-                        minWidth: '120px'
+                        minWidth: '120px',
+                        boxShadow: tempSelection?.name === v.name ? '0 4px 6px -1px rgba(5, 150, 105, 0.2)' : 'none'
                       }}
                     >
                       {v.name}<br/>
