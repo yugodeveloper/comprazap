@@ -85,6 +85,10 @@ export default function PortalCondominio() {
   }
 
   const handleShare = (camp: any) => {
+    // Bloqueia caso clique em um botão que deveria estar desativado
+    const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
+    if (isExpired) return;
+
     const url = `${window.location.origin}/c/${camp.id}`;
     const texto = `🛍️ *NOVIDADE NO LANAI!*\n\n*${camp.title}*\n\nConfira os detalhes e faça sua reserva pelo link abaixo:\n👉 ${url}`;
     
@@ -230,18 +234,34 @@ export default function PortalCondominio() {
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.title}</p>
                       <div style={{display: 'flex', gap: '5px', alignItems: 'center'}}>
                         <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: isExpired ? '#ef4444' : '#059669', textTransform: 'uppercase' }}>{isExpired ? 'Encerrada' : 'Ativa 🟢'}</p>
-                        {/* ITEM 2: Texto de validade adicionado */}
                         {!isExpired && camp.expires_at && <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase' }}>| Expira em: {new Date(camp.expires_at).toLocaleDateString('pt-BR')}</p>}
                         {pendingAproval > 0 && <span style={{backgroundColor: '#f59e0b', color: 'white', fontSize: '6px', padding: '2px 4px', borderRadius: '4px', fontWeight: 900}}>🔔 {pendingAproval} AGUARDANDO PIX</span>}
                       </div>
                     </div>
-                    <button onClick={() => handleShare(camp)} style={{ border: 'none', background: '#059669', color: 'white', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 900, fontSize: '10px' }}>DIVULGAR 📢</button>
+                    
+                    {/* BOTÃO DIVULGAR COM BLOQUEIO */}
+                    <button 
+                      onClick={() => handleShare(camp)} 
+                      disabled={isExpired}
+                      style={{ 
+                        border: 'none', 
+                        background: isExpired ? '#e7e5e4' : '#059669', 
+                        color: isExpired ? '#a8a29e' : 'white', 
+                        padding: '8px 12px', 
+                        borderRadius: '8px', 
+                        cursor: isExpired ? 'not-allowed' : 'pointer', 
+                        fontWeight: 900, 
+                        fontSize: '10px' 
+                      }}
+                    >
+                      {isExpired ? 'ENCERRADA' : 'DIVULGAR 📢'}
+                    </button>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '6px 0', borderTop: '1px solid #fafafa', borderBottom: '1px solid #fafafa', textAlign: 'center' }}>
                     <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{camp.views || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>VIEWS</p></div>
                     <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#059669' }}>{camp.orders?.length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PEDIDOS</p></div>
-                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PAGOS</p></div>
+                    <div><p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#059669' }}>{camp.orders?.filter((o:any)=>o.status==='paid').length || 0}</p><p style={{ margin: 0, fontSize: '6px', color: '#a8a29e' }}>PAGOS</p></div>
                   </div>
 
                   <div style={{ display: 'flex', gap: '4px' }}>

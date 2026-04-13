@@ -190,7 +190,13 @@ function LandingContent() {
           setLoading(false); return;
         }
       }
-      setStep('itens');
+
+      // NOVA REGRA: Se a campanha expirou e não há pedido ativo, não permite avançar
+      if (isExpired) {
+          setStep('identificacao');
+      } else {
+          setStep('itens');
+      }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
@@ -355,6 +361,15 @@ function LandingContent() {
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Para iniciar seu pedido, primeiro informe seu número de telefone no Whatsapp</h3>
+              
+              {/* AVISO DE CAMPANHA ENCERRADA */}
+              {isExpired ? (
+                <div style={{ padding: '20px', backgroundColor: '#fef2f2', borderRadius: '15px', border: '1px solid #fee2e2', marginBottom: '15px' }}>
+                  <p style={{ color: '#ef4444', fontWeight: 900, margin: 0, fontSize: '14px' }}>Esta campanha foi encerrada e não aceita novos pedidos. 🛑</p>
+                  <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '10px' }}>Se você já tem um pedido iniciado, informe o número abaixo para continuar.</p>
+                </div>
+              ) : null}
+
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
               <button onClick={() => identificarUsuario(contact)} style={btnStyle}>ACESSAR OFERTA</button>
             </div>
@@ -396,10 +411,10 @@ function LandingContent() {
               <div style={{ background: 'white', padding: 15, borderRadius: 20, border: '1px solid #eee' }}>
                 <p style={{ fontSize: 9, fontWeight: 900, color: '#999', marginBottom: 12, textAlign: 'center', textTransform: 'uppercase' }}>O QUE VOCÊ DESEJA?</p>
                 
-                {/* Lógica de Campanha Encerrada */}
+                {/* REFORÇO DA TRAVA: Caso o usuário tente burlar o passo anterior */}
                 {isExpired && !existingOrder ? (
                   <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#fef2f2', borderRadius: '15px', border: '1px solid #fee2e2' }}>
-                    <p style={{ color: '#ef4444', fontWeight: 900, margin: 0, fontSize: '14px' }}>Esta campanha foi encerrada e não aceita novos pedidos. 🛑</p>
+                    <p style={{ color: '#ef4444', fontWeight: 900, margin: 0, fontSize: '14px' }}>Esta campanha foi encerrada. 🛑</p>
                   </div>
                 ) : (
                   <>
@@ -509,7 +524,8 @@ function LandingContent() {
               </div>
 
               {orderStatus === 'paid' ? (
-                <button onClick={handleNovoPedido} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
+                // Se expirada, não permite iniciar outro
+                !isExpired && <button onClick={handleNovoPedido} style={{ ...btnStyle, backgroundColor: '#000', marginTop: 25 }}>FAZER OUTRO PEDIDO</button>
               ) : (
                 <button onClick={handleCancelarCompra} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', marginTop: 30, cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>CANCELAR ESTE PEDIDO</button>
               )}
