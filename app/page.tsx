@@ -169,6 +169,7 @@ export default function PortalCondominio() {
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
+  const recoveryStyle: React.CSSProperties = { display: 'block', textAlign: 'center', marginTop: '15px', fontSize: '11px', color: '#a8a29e', textDecoration: 'underline', cursor: 'pointer' };
 
   if (configError) return <div style={{ padding: 40, textAlign: 'center', color: 'red' }}><h1>ERRO DE CONFIGURAÇÃO</h1><p>{configError}</p></div>
 
@@ -182,13 +183,15 @@ export default function PortalCondominio() {
             <>
               <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
               <button onClick={handleCheckPhone} style={btnEmerald}>{loading ? '...' : 'ENTRAR'}</button>
+              <a href={`https://wa.me/5548991216503?text=Olá, esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </>
           )}
           {view === 'login' && (
             <form onSubmit={handleAuthAction}>
-              <p style={{ textAlign: 'center', fontWeight: '900', fontSize: '14px', marginBottom: '15px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</p>
+              <p style={{ textAlign: 'center', fontWeight: '900', fontSize: '14px', marginBottom: '15px' }}>Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!</p>
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               <button type="submit" style={btnEmerald}>CONFIRMAR</button>
+              <a href={`https://wa.me/5548991216503?text=Olá, esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </form>
           )}
           {view === 'signup' && (
@@ -198,18 +201,6 @@ export default function PortalCondominio() {
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
               <button type="submit" style={btnEmerald}>CADASTRAR</button>
             </form>
-          )}
-          
-          {/* LINK DE RECUPERAÇÃO SEMPRE VISÍVEL NO LOGIN/PHONE */}
-          {(view === 'phone' || view === 'login') && (
-            <a 
-              href={`https://wa.me/5548991216503?text=Olá, esqueci minha senha do CompraZap. Meu telefone é ${phone}`} 
-              target="_blank" 
-              rel="noreferrer" 
-              style={{ display: 'block', textAlign: 'center', marginTop: '20px', fontSize: '11px', color: '#a8a29e', textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              Esqueci minha senha
-            </a>
           )}
         </div>
       </div>
@@ -221,7 +212,7 @@ export default function PortalCondominio() {
       <div style={{ maxWidth: '450px', margin: '0 auto' }}>
         <header style={{ backgroundColor: 'white', padding: '12px 18px', borderRadius: '18px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</h2>
+            <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!</h2>
             <p style={{ margin: 0, fontSize: '8px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>Unidade {savedProfile?.unit}</p>
           </div>
           <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '8px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
@@ -297,7 +288,7 @@ export default function PortalCondominio() {
                   <div key={order.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '11px' }}>{order.campaigns?.title}</p>
-                      <p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>Vendedor: {order.campaigns?.profiles?.full_name?.split(' ')[0]}</p>
+                      <p style={{ margin: 0, fontSize: '7px', color: '#a8a29e' }}>Vendedor: {order.campaigns?.profiles?.full_name?.split(' ')[0] || 'Vizinho'}</p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: order.status === 'paid' ? '#059669' : '#f59e0b' }}>

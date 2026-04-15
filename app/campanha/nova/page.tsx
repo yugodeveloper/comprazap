@@ -31,6 +31,7 @@ function NovaCampanhaContent() {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
   };
 
+  // --- LÓGICA DE RESET AUTOMÁTICO ---
   useEffect(() => {
     if (!editId) {
       setTitle('');
@@ -56,9 +57,10 @@ function NovaCampanhaContent() {
   }, []);
 
   useEffect(() => {
-    if (locationName.length > 0 && !selectedLocationId) {
+    const search = locationName.trim();
+    if (search.length > 0 && !selectedLocationId) {
       const filtered = allLocations.filter(loc => 
-        loc.name.toLowerCase().includes(locationName.toLowerCase())
+        loc.name.toLowerCase().includes(search.toLowerCase())
       );
       setFilteredLocations(filtered);
     } else {
