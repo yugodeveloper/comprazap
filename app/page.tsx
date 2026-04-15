@@ -169,7 +169,7 @@ export default function PortalCondominio() {
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
-  const recoveryStyle: React.CSSProperties = { display: 'block', textAlign: 'center', marginTop: '15px', fontSize: '11px', color: '#a8a29e', textDecoration: 'underline', cursor: 'pointer' };
+  const recoveryStyle: React.CSSProperties = { display: 'block', textAlign: 'center', marginTop: '15px', fontSize: '12px', color: '#64748b', textDecoration: 'underline', cursor: 'pointer', fontWeight: '600' };
 
   if (configError) return <div style={{ padding: 40, textAlign: 'center', color: 'red' }}><h1>ERRO DE CONFIGURAÇÃO</h1><p>{configError}</p></div>
 
@@ -183,7 +183,8 @@ export default function PortalCondominio() {
             <>
               <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
               <button onClick={handleCheckPhone} style={btnEmerald}>{loading ? '...' : 'ENTRAR'}</button>
-              <a href={`https://wa.me/5548991216503?text=Olá, esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
+              {/* CORREÇÃO DO NÚMERO ABAIXO: 48 99169-4249 */}
+              <a href={`https://wa.me/5548991694249?text=Olá Gustavo! Esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </>
           )}
           {view === 'login' && (
@@ -191,7 +192,8 @@ export default function PortalCondominio() {
               <p style={{ textAlign: 'center', fontWeight: '900', fontSize: '14px', marginBottom: '15px' }}>Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!</p>
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               <button type="submit" style={btnEmerald}>CONFIRMAR</button>
-              <a href={`https://wa.me/5548991216503?text=Olá, esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
+              {/* CORREÇÃO DO NÚMERO ABAIXO: 48 99169-4249 */}
+              <a href={`https://wa.me/5548991694249?text=Olá Gustavo! Esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </form>
           )}
           {view === 'signup' && (
