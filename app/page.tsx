@@ -189,6 +189,16 @@ export default function PortalCondominio() {
               <p style={{ textAlign: 'center', fontWeight: '900', fontSize: '14px', marginBottom: '15px' }}>Olá, {savedProfile?.full_name?.split(' ')[0]}!</p>
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               <button type="submit" style={btnEmerald}>CONFIRMAR</button>
+              
+              {/* LINK DE RECUPERAÇÃO DE SENHA */}
+              <a 
+                href={`https://wa.me/5548991216503?text=Olá, esqueci minha senha do CompraZap. Meu telefone é ${phone}`} 
+                target="_blank" 
+                rel="noreferrer" 
+                style={{ display: 'block', textAlign: 'center', marginTop: '15px', fontSize: '11px', color: '#a8a29e', textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                Esqueci minha senha
+              </a>
             </form>
           )}
           {view === 'signup' && (
