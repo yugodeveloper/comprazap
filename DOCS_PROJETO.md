@@ -1,22 +1,23 @@
 # Projeto CompraZap ⚡ - Portal Condomínio Lanai
 
 ## 📝 Status Atual do Projeto
-O projeto passou por testes reais com a campanha "Cucas da Vanessa". Foram validados os fluxos de criação, divulgação via WhatsApp, realização de pedidos por vizinhos e gestão de pagamentos via Pix com anexo de comprovante.
+O sistema evoluiu de uma ferramenta de uso único para uma plataforma multicondomínio. Já suporta múltiplos vendedores, diferentes locais (condomínios) e possui travas de segurança para campanhas encerradas.
 
 ## 🚀 Implementações Recentes (Abril 2026)
 
-### 1. Segurança e Regras de Negócio (Landing Page)
-- **Bloqueio de Novos Pedidos:** Campanhas com data de validade (`expires_at`) vencida não aceitam mais novos compradores.
-- **Continuidade de Fluxo:** Compradores que já possuem um pedido iniciado em uma campanha encerrada podem continuar para as telas de pagamento e envio de comprovante.
-- **Texto de Identificação:** Alterado para "Para iniciar seu pedido, primeiro informe seu número de telefone no Whatsapp" para melhorar a clareza.
+### 1. Sistema Multicondomínio (Locais)
+- **Base de Dados:** Criação da tabela `locations` e vínculo dinâmico com a tabela `campaigns`.
+- **Inteligência de Cadastro:** Implementação de Autocomplete na criação de campanhas. O vendedor pode selecionar um condomínio já existente (cadastrado por ele ou outros) ou criar um novo instantaneamente.
+- **Landing Page Dinâmica:** O local exibido para o comprador agora é extraído do banco de dados, removendo textos fixos e permitindo que o vendedor atue em diferentes prédios.
 
-### 2. Interface e UX (Landing Page)
-- **Cores dos Itens:** As opções de produtos ("O que você deseja?") agora possuem fundos em tons pastéis aleatórios, melhorando o apelo visual sem conflitar com a identidade verde (#059669).
-- **Feedback de Seleção:** O item selecionado assume a cor verde sólida para destaque imediato.
+### 2. Fluxo de Login e Segurança
+- **Recuperação de Senha:** Adicionado link "Esqueci minha senha" que direciona o usuário para o WhatsApp do suporte (Gustavo), com mensagem pré-preenchida contendo o telefone do solicitante.
+- **Políticas de Acesso (RLS):** Ajuste nas permissões do Supabase para permitir que usuários não autenticados (visitantes/compradores) consultem a lista de locais para o autocomplete.
+- **Persistência de Estado:** Correção do bug que mantinha dados de uma campanha anterior ao tentar criar uma nova logo após uma edição.
 
-### 3. Painel do Vendedor (Home)
-- **Controle de Divulgação:** O botão "DIVULGAR" agora é desabilitado e renomeado para "ENCERRADA" (com estilo cinza) quando a campanha expira, evitando compartilhamentos indevidos.
-- **Gestão de Status:** Reforço visual de campanhas ativas vs. encerradas.
+### 3. Ajustes de UX e Interface
+- **Padronização:** Botão principal alterado para "+ NOVA CAMPANHA".
+- **Feedback visual:** Link de recuperação de senha posicionado estrategicamente para ser visível em dispositivos móveis.
 
 ## 🛠 Próximos Passos (Backlog)
 - [ ] Ajustar layout do Relatório de Entregas para impressão/PDF.
@@ -24,9 +25,14 @@ O projeto passou por testes reais com a campanha "Cucas da Vanessa". Foram valid
 - [ ] Adicionar campo de "Estoque Limitado" por variação de produto.
 - [ ] Criar dashboard financeiro consolidado para o vendedor.
 
+## 🔒 Futuras Alterações Importantes (Segurança e Escala)
+- **Criptografia de Senhas:** Migrar o armazenamento de senhas de "texto simples" para "hash" (criptografadas), garantindo que nem o administrador do banco tenha acesso às senhas reais.
+- **Troca de Senha Interna:** Criar uma área no perfil do vendedor para alteração de senha autônoma, reduzindo a carga de suporte manual.
+- **Portal do Morador:** Página centralizada onde o morador digita o nome do seu condomínio e vê todas as campanhas ativas naquele local.
+
 ## 📂 Estrutura de Arquivos Principal
-- `app/page.tsx`: Portal principal do vendedor e login.
-- `app/c/[id]/page.tsx`: Landing page do comprador (pública).
-- `app/campanha/nova/page.tsx`: Formulário de criação/edição de ofertas.
-- `app/campanha/gestao/[id]/page.tsx`: Painel de controle de pedidos e aprovação de Pix.
-- `lib/supabase.ts`: Configuração e conexão com o banco de dados.
+- `app/page.tsx`: Portal do vendedor, login e gestão de perfil.
+- `app/c/[id]/page.tsx`: Landing page dinâmica do comprador.
+- `app/campanha/nova/page.tsx`: Formulário inteligente de criação/edição.
+- `app/campanha/gestao/[id]/page.tsx`: Painel de pedidos e aprovação de Pix.
+- `lib/supabase.ts`: Configuração da conexão com o banco.

@@ -183,7 +183,6 @@ export default function PortalCondominio() {
             <>
               <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
               <button onClick={handleCheckPhone} style={btnEmerald}>{loading ? '...' : 'ENTRAR'}</button>
-              {/* CORREÇÃO DO NÚMERO ABAIXO: 48 99169-4249 */}
               <a href={`https://wa.me/5548991694249?text=Olá Gustavo! Esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </>
           )}
@@ -192,7 +191,6 @@ export default function PortalCondominio() {
               <p style={{ textAlign: 'center', fontWeight: '900', fontSize: '14px', marginBottom: '15px' }}>Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!</p>
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
               <button type="submit" style={btnEmerald}>CONFIRMAR</button>
-              {/* CORREÇÃO DO NÚMERO ABAIXO: 48 99169-4249 */}
               <a href={`https://wa.me/5548991694249?text=Olá Gustavo! Esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </form>
           )}
@@ -209,6 +207,15 @@ export default function PortalCondominio() {
     )
   }
 
+  // --- LÓGICA DE ORDENAÇÃO: Ativas primeiro, Encerradas por último ---
+  const sortedCampaigns = [...myCampaigns].sort((a, b) => {
+    const aExpired = a.expires_at ? new Date(a.expires_at) < new Date() : false;
+    const bExpired = b.expires_at ? new Date(b.expires_at) < new Date() : false;
+    if (aExpired && !bExpired) return 1;  // a (encerrada) vai para baixo
+    if (!aExpired && bExpired) return -1; // a (ativa) vai para cima
+    return 0; // mantém a ordem original (created_at desc) para itens do mesmo status
+  });
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fafaf9', padding: '12px', fontFamily: 'sans-serif', color: '#1c1917' }}>
       <div style={{ maxWidth: '450px', margin: '0 auto' }}>
@@ -224,12 +231,23 @@ export default function PortalCondominio() {
           <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS OFERTAS</h3>
           <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA CAMPANHA</button>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {myCampaigns.map(camp => {
+            {sortedCampaigns.map(camp => {
               const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
               const pendingAproval = camp.orders?.filter((o:any) => o.status === 'pending' && o.receipt_url).length || 0;
               
               return (
-                <div key={camp.id} style={{ backgroundColor: 'white', padding: '10px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div key={camp.id} style={{ 
+                  backgroundColor: 'white', 
+                  padding: '10px', 
+                  borderRadius: '18px', 
+                  border: '1px solid #f5f5f4', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '6px',
+                  // ITEM 1: Efeito esmaecido se estiver encerrada
+                  opacity: isExpired ? 0.5 : 1,
+                  filter: isExpired ? 'grayscale(0.3)' : 'none'
+                }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f5f5f4', overflow: 'hidden', flexShrink: 0 }}>
                       {camp.image_url && <img src={camp.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
