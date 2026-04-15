@@ -22,16 +22,43 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
+  // --- NOVOS ESTADOS PARA LOCAIS ---
+  const [locationName, setLocationName] = useState('')
+  const [allLocations, setAllLocations] = useState<any[]>([])
+  const [filteredLocations, setFilteredLocations] = useState<any[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
+
   const maskDate = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
   };
+
+  // Carregar locais existentes para o autocomplete
+  useEffect(() => {
+    const fetchLocs = async () => {
+      const { data } = await supabase.from('locations').select('*').order('name');
+      if (data) setAllLocations(data);
+    };
+    fetchLocs();
+  }, []);
+
+  // Filtro de busca de local
+  useEffect(() => {
+    if (locationName.length > 0 && !selectedLocationId) {
+      const filtered = allLocations.filter(loc => 
+        loc.name.toLowerCase().includes(locationName.toLowerCase())
+      );
+      setFilteredLocations(filtered);
+    } else {
+      setFilteredLocations([]);
+    }
+  }, [locationName, allLocations, selectedLocationId]);
 
   useEffect(() => {
     if (editId) {
       const loadEditData = async () => {
         const { data: camp, error } = await supabase
           .from('campaigns')
-          .select('*, products(*)')
+          .select('*, products(*), locations(id, name)')
           .eq('id', editId)
           .single();
 
@@ -47,6 +74,12 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
+          // Carregar Local se existir
+          if (camp.locations) {
+            setLocationName(camp.locations.name);
+            setSelectedLocationId(camp.locations.id);
+          }
+
           if (camp.products) {
             const prod = Array.isArray(camp.products) ? camp.products[0] : camp.products;
             if (prod && prod.variations) {
@@ -106,13 +139,25 @@ function NovaCampanhaContent() {
       const userId = localStorage.getItem('user_id')
       if (!userId) throw new Error("Usuário não identificado.");
 
+      // 1. Lógica de Local: Criar se for novo
+      let finalLocationId = selectedLocationId;
+      if (!finalLocationId && locationName) {
+        const { data: newLoc } = await supabase
+          .from('locations')
+          .insert({ name: locationName })
+          .select()
+          .single();
+        if (newLoc) finalLocationId = newLoc.id;
+      }
+
       const parts = expiresAt.split('/');
       const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}T23:59:59` : null;
 
       const payload = {
         title, description, pix_key: pixKey, expires_at: isoDate, max_sales: parseInt(maxSales),
         image_url: headerImg || null, share_image: shareImg || null, image_gallery: gallery,
-        creator_id: userId, status: 'active'
+        creator_id: userId, status: 'active',
+        location_id: finalLocationId // Salvando o vínculo
       };
 
       let campId = editId;
@@ -132,7 +177,6 @@ function NovaCampanhaContent() {
           price: parseFloat(String(v.price).replace(',', '.'))
         }));
 
-      // CHAMADA RPC ATUALIZADA: Agora faz UPDATE ou INSERT sem apagar a linha
       const { error: rpcErr } = await supabase.rpc('save_campaign_products', {
         target_campaign_id: campId,
         new_variations: formattedVariations
@@ -161,6 +205,39 @@ function NovaCampanhaContent() {
         </header>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* CAMPO DE LOCAL / CONDOMÍNIO */}
+          <div style={{ position: 'relative' }}>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '5px', display: 'block' }}>Condomínio / Local da Oferta</label>
+            <input 
+              placeholder="Digite o nome (ex: Lanai, Tom Jobim...)" 
+              required 
+              style={inputStyle} 
+              value={locationName} 
+              onChange={e => {
+                setLocationName(e.target.value);
+                setSelectedLocationId(null); // Reseta o ID se o usuário voltar a digitar
+              }} 
+            />
+            {filteredLocations.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', zIndex: 10, marginTop: '5px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                {filteredLocations.map(loc => (
+                  <div 
+                    key={loc.id} 
+                    onClick={() => {
+                      setLocationName(loc.name);
+                      setSelectedLocationId(loc.id);
+                      setFilteredLocations([]);
+                    }}
+                    style={{ padding: '12px', fontSize: '14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
+                  >
+                    🏢 {loc.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: '15px' }}>
             <label style={{ flex: 1.5, height: '100px', backgroundColor: 'white', borderRadius: '15px', border: '2px dashed #cbd5e1', overflow: 'hidden', cursor:'pointer' }}>
               <input type="file" hidden onChange={(e) => handleUpload(e, 'header')} />

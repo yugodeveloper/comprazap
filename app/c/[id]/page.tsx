@@ -223,9 +223,16 @@ function LandingContent() {
 
   async function fetchData() {
     try {
-      const { data: cp } = await supabase.from('campaigns').select('*').eq('id', id).single();
+      // ATUALIZADO: Busca também o nome do local (condomínio)
+      const { data: cp } = await supabase
+        .from('campaigns')
+        .select('*, locations(name)')
+        .eq('id', id)
+        .single();
+
       if (!cp) return;
       setCampaign(cp);
+
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
       
       let finalVariations = [];
@@ -315,7 +322,8 @@ function LandingContent() {
         </div>
 
         <div style={{ display: 'flex', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9' }}>
-          <InfoBadge label="Local" value="Cond. Lanai" />
+          {/* DINÂMICO: Mostra o nome do local vindo do banco */}
+          <InfoBadge label="Local" value={campaign?.locations?.name || 'Não informado'} />
           <InfoBadge label="Expira" value={campaign?.expires_at ? new Date(campaign.expires_at).toLocaleDateString('pt-BR') : '--'} />
           <InfoBadge label="Vizinhos" value={`${totalBuyers} já pediram`} />
         </div>
@@ -467,7 +475,8 @@ function LandingContent() {
           {step === 'dados' && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setStep('itens')} style={{ float: 'left', background: 'none', border: 'none', color: '#999', fontSize: 12 }}>← Mudar Pedido</button>
-              <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Confirmar Entrega</h3>
+              {/* DINÂMICO: Reforça o nome do condomínio na entrega */}
+              <h3 style={{ fontWeight: 900, marginTop: 30, fontSize: 16 }}>Confirmar Entrega no {campaign?.locations?.name || 'Local'}</h3>
               <input placeholder="Seu Nome Completo" style={inputStyle} value={buyerName} onChange={e => setBuyerName(e.target.value)} />
               <input placeholder="Unidade / Apto" style={inputStyle} value={buyerApto} onChange={e => setBuyerApto(e.target.value)} />
               <button onClick={concluirPedido} style={btnStyle}>CONFIRMAR PEDIDO</button>
