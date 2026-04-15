@@ -31,8 +31,7 @@ function NovaCampanhaContent() {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
   };
 
-  // --- NOVA LÓGICA DE RESET ---
-  // Limpa os campos quando não há ID de edição (Nova Campanha)
+  // --- LÓGICA DE RESET AUTOMÁTICO ---
   useEffect(() => {
     if (!editId) {
       setTitle('');
