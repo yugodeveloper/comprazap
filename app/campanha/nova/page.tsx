@@ -22,7 +22,6 @@ function NovaCampanhaContent() {
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
-  // --- NOVOS ESTADOS PARA LOCAIS ---
   const [locationName, setLocationName] = useState('')
   const [allLocations, setAllLocations] = useState<any[]>([])
   const [filteredLocations, setFilteredLocations] = useState<any[]>([])
@@ -32,7 +31,24 @@ function NovaCampanhaContent() {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2").replace(/(\/\d{4})\d+?$/, "$1");
   };
 
-  // Carregar locais existentes para o autocomplete
+  // --- NOVA LÓGICA DE RESET ---
+  // Limpa os campos quando não há ID de edição (Nova Campanha)
+  useEffect(() => {
+    if (!editId) {
+      setTitle('');
+      setDescription('');
+      setPixKey('');
+      setExpiresAt('');
+      setMaxSales('50');
+      setHeaderImg('');
+      setShareImg('');
+      setGallery([]);
+      setVariations([{ name: '', price: '' }]);
+      setLocationName('');
+      setSelectedLocationId(null);
+    }
+  }, [editId]);
+
   useEffect(() => {
     const fetchLocs = async () => {
       const { data } = await supabase.from('locations').select('*').order('name');
@@ -41,7 +57,6 @@ function NovaCampanhaContent() {
     fetchLocs();
   }, []);
 
-  // Filtro de busca de local
   useEffect(() => {
     if (locationName.length > 0 && !selectedLocationId) {
       const filtered = allLocations.filter(loc => 
@@ -74,7 +89,6 @@ function NovaCampanhaContent() {
           setShareImg(camp.share_image || '');
           setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
           
-          // Carregar Local se existir
           if (camp.locations) {
             setLocationName(camp.locations.name);
             setSelectedLocationId(camp.locations.id);
@@ -139,7 +153,6 @@ function NovaCampanhaContent() {
       const userId = localStorage.getItem('user_id')
       if (!userId) throw new Error("Usuário não identificado.");
 
-      // 1. Lógica de Local: Criar se for novo
       let finalLocationId = selectedLocationId;
       if (!finalLocationId && locationName) {
         const { data: newLoc } = await supabase
@@ -157,7 +170,7 @@ function NovaCampanhaContent() {
         title, description, pix_key: pixKey, expires_at: isoDate, max_sales: parseInt(maxSales),
         image_url: headerImg || null, share_image: shareImg || null, image_gallery: gallery,
         creator_id: userId, status: 'active',
-        location_id: finalLocationId // Salvando o vínculo
+        location_id: finalLocationId
       };
 
       let campId = editId;
@@ -206,7 +219,6 @@ function NovaCampanhaContent() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* CAMPO DE LOCAL / CONDOMÍNIO */}
           <div style={{ position: 'relative' }}>
             <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '5px', display: 'block' }}>Condomínio / Local da Oferta</label>
             <input 
@@ -216,7 +228,7 @@ function NovaCampanhaContent() {
               value={locationName} 
               onChange={e => {
                 setLocationName(e.target.value);
-                setSelectedLocationId(null); // Reseta o ID se o usuário voltar a digitar
+                setSelectedLocationId(null);
               }} 
             />
             {filteredLocations.length > 0 && (

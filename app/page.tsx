@@ -85,7 +85,6 @@ export default function PortalCondominio() {
   }
 
   const handleShare = (camp: any) => {
-    // Bloqueia caso clique em um botão que deveria estar desativado
     const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
     if (isExpired) return;
 
@@ -218,7 +217,8 @@ export default function PortalCondominio() {
 
         <section style={{marginBottom: '30px'}}>
           <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS OFERTAS</h3>
-          <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA OFERTA</button>
+          {/* MUDANÇA DE LABEL ABAIXO */}
+          <button onClick={() => router.push('/campanha/nova')} style={{ ...btnEmerald, padding: '12px', marginBottom: '15px', backgroundColor: '#059669' }}>+ NOVA CAMPANHA</button>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {myCampaigns.map(camp => {
               const isExpired = camp.expires_at ? new Date(camp.expires_at) < new Date() : false;
@@ -239,7 +239,6 @@ export default function PortalCondominio() {
                       </div>
                     </div>
                     
-                    {/* BOTÃO DIVULGAR COM BLOQUEIO */}
                     <button 
                       onClick={() => handleShare(camp)} 
                       disabled={isExpired}
@@ -281,7 +280,7 @@ export default function PortalCondominio() {
 
         {myPurchases.length > 0 && (
           <section style={{marginBottom: '30px'}}>
-             <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS COMPRAS COM VIZINHOS</h3>
+             <h3 style={{fontSize: '10px', fontWeight 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS COMPRAS COM VIZINHOS</h3>
              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {myPurchases.map(order => (
                   <div key={order.id} style={{ backgroundColor: 'white', padding: '12px', borderRadius: '18px', border: '1px solid #f5f5f4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
