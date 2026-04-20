@@ -134,7 +134,9 @@ function LandingContent() {
 
   const enviarNotificacaoTelegram = async (order: any, itens: any[], receiptUrl?: string) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
+    // Utiliza o ID do vendedor carregado do banco, com fallback para o ID padrão
+    // Certifique-se de que a coluna 'telegram_id' existe na tabela 'profiles' do Supabase.
+    const chatId = seller?.telegram_id || process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
 
     const itensMsg = itens.map(i => `${i.qty}x ${i.name}`).join(', ');

@@ -9,12 +9,14 @@ export default function PortalCondominio() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'phone' | 'login' | 'signup'>('phone')
   const [configError, setConfigError] = useState<string | null>(null)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
   
   const [formData, setFormData] = useState({ 
     full_name: '', 
     email: '', 
     unit: '', 
-    password: '' 
+    password: '',
+    telegram_id: ''
   })
   const [savedProfile, setSavedProfile] = useState<any>(null)
   const [myPurchases, setMyPurchases] = useState<any[]>([])
@@ -46,6 +48,12 @@ export default function PortalCondominio() {
 
           if (data && !error) {
             setSavedProfile(data);
+            setFormData(prev => ({
+              ...prev,
+              full_name: data.full_name || '',
+              unit: data.unit || '',
+              telegram_id: data.telegram_id || ''
+            }));
             setIsLoggedIn(true);
             fetchUserActivity(savedPhone, savedId);
           } else {
@@ -152,6 +160,12 @@ export default function PortalCondominio() {
             localStorage.setItem('user_phone', savedProfile.phone); 
             localStorage.setItem('user_id', savedProfile.id); 
             setIsLoggedIn(true); 
+            setFormData(prev => ({
+              ...prev,
+              full_name: savedProfile.full_name || '',
+              unit: savedProfile.unit || '',
+              telegram_id: savedProfile.telegram_id || ''
+            }));
             fetchUserActivity(savedProfile.phone, savedProfile.id);
         } else { alert("Senha incorreta!"); } 
       } else { 
@@ -165,6 +179,26 @@ export default function PortalCondominio() {
       } 
     } catch (error: any) { alert("Erro: " + error.message); } 
     finally { setLoading(false); } 
+  }
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          full_name: formData.full_name, 
+          unit: formData.unit, 
+          telegram_id: formData.telegram_id 
+        })
+        .eq('id', savedProfile.id);
+      if (error) throw error;
+      setSavedProfile({ ...savedProfile, ...formData });
+      setIsEditingProfile(false);
+      alert("Perfil atualizado! ✅");
+    } catch (error: any) { alert("Erro: " + error.message); }
+    finally { setLoading(false); }
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
@@ -198,6 +232,8 @@ export default function PortalCondominio() {
             <form onSubmit={handleAuthAction}>
               <input placeholder="Nome Completo" required style={inputStyle} value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
               <input placeholder="Unidade (Apto)" required style={inputStyle} value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
+              <input placeholder="ID Telegram (p/ avisos)" style={inputStyle} value={formData.telegram_id} onChange={e => setFormData({...formData, telegram_id: e.target.value})} />
+              <p style={{ fontSize: '9px', color: '#a8a29e', marginBottom: '10px', textAlign: 'center', fontWeight: 'bold' }}>Obtenha seu ID enviando /id para o @userinfobot no Telegram</p>
               <input type="password" placeholder="Sua Senha" required style={inputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
               <button type="submit" style={btnEmerald}>CADASTRAR</button>
             </form>
@@ -224,8 +260,26 @@ export default function PortalCondominio() {
             <h2 style={{ margin: 0, fontWeight: '900', fontStyle: 'italic', fontSize: '16px' }}>Olá, {savedProfile?.full_name?.split(' ')[0] || 'Vizinho'}!</h2>
             <p style={{ margin: 0, fontSize: '8px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase' }}>Unidade {savedProfile?.unit}</p>
           </div>
-          <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '8px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <button onClick={() => setIsEditingProfile(!isEditingProfile)} style={{ fontSize: '8px', fontWeight: '900', color: '#059669', backgroundColor: '#ecfdf5', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>
+              {isEditingProfile ? 'CANCELAR' : 'PERFIL ⚙️'}
+            </button>
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }} style={{ fontSize: '8px', fontWeight: '900', color: '#ef4444', backgroundColor: '#fef2f2', border: 'none', padding: '6px 10px', borderRadius: '50px', cursor: 'pointer' }}>SAIR</button>
+          </div>
         </header>
+
+        {isEditingProfile && (
+          <section style={{ backgroundColor: 'white', padding: '20px', borderRadius: '18px', marginBottom: '15px', border: '1px solid #e7e5e4' }}>
+            <h3 style={{ fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '15px', textTransform: 'uppercase' }}>Editar Perfil</h3>
+            <form onSubmit={handleUpdateProfile}>
+              <input placeholder="Nome Completo" required style={inputStyle} value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
+              <input placeholder="Unidade (Apto)" required style={inputStyle} value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
+              <input placeholder="ID Telegram" style={inputStyle} value={formData.telegram_id} onChange={e => setFormData({...formData, telegram_id: e.target.value})} />
+              <p style={{ fontSize: '9px', color: '#a8a29e', marginBottom: '15px', textAlign: 'center' }}>Receba avisos de vendas via @userinfobot no Telegram</p>
+              <button type="submit" style={btnEmerald} disabled={loading}>{loading ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES'}</button>
+            </form>
+          </section>
+        )}
 
         <section style={{marginBottom: '30px'}}>
           <h3 style={{fontSize: '10px', fontWeight: 900, color: '#a8a29e', marginBottom: '10px', letterSpacing: '1px'}}>MINHAS OFERTAS</h3>
