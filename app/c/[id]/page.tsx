@@ -185,7 +185,7 @@ function LandingContent() {
         
         if (activeOrder) {
           setExistingOrder(activeOrder); 
-          setOrderStatus(activeOrder.status); 
+          setOrderStatus(activeOrder.status || 'pending'); 
           setObservations(activeOrder.observations || '');
           setItemsList(activeOrder.selected_variations || []); 
           setStep('concluido');
@@ -217,7 +217,7 @@ function LandingContent() {
   useEffect(() => {
     if (!existingOrder?.id) return;
     const channel = supabase.channel(`order-status-${existingOrder.id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${existingOrder.id}` }, (payload) => {
-        setOrderStatus(payload.new.status);
+        setOrderStatus(payload.new.status || 'pending');
         if (payload.new.receipt_url) setExistingOrder((prev: any) => ({ ...prev, receipt_url: payload.new.receipt_url }));
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -258,7 +258,7 @@ function LandingContent() {
     setLoading(true);
     const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations: observations };
     const { data: savedOrder } = await supabase.from('orders').upsert(existingOrder?.id ? { id: existingOrder.id, ...orderData } : orderData).select().single();
-    setExistingOrder(savedOrder); setOrderStatus(savedOrder.status);
+    setExistingOrder(savedOrder); setOrderStatus(savedOrder?.status || 'pending');
     await enviarNotificacaoTelegram(savedOrder, itemsList);
     setStep('concluido'); setLoading(false);
   };
