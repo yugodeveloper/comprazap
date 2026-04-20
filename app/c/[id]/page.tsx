@@ -187,7 +187,7 @@ function LandingContent() {
           setExistingOrder(activeOrder); 
           setOrderStatus(activeOrder.status || 'pending'); 
           setObservations(activeOrder.observations || '');
-          setItemsList(activeOrder.selected_variations || []); 
+          setItemsList((activeOrder.selected_variations as any[]) || []); 
           setStep('concluido');
           setLoading(false); return;
         }
