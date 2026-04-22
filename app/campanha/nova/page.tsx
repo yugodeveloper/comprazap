@@ -87,7 +87,7 @@ function NovaCampanhaContent() {
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
           setShareImg(camp.share_image || '');
-          setGallery(Array.isArray(camp.image_gallery) ? camp.image_gallery : []);
+          setGallery((camp.image_gallery as string[]) || []);
           
           if (camp.locations) {
             setLocationName(camp.locations.name);
