@@ -209,6 +209,7 @@ export type Database = {
           id: string
           password: string | null
           phone: string | null
+          telegram_id: string | null
           unit: string | null
           updated_at: string | null
         }
@@ -220,6 +221,7 @@ export type Database = {
           id?: string
           password?: string | null
           phone?: string | null
+          telegram_id?: string | null
           unit?: string | null
           updated_at?: string | null
         }
@@ -231,6 +233,7 @@ export type Database = {
           id?: string
           password?: string | null
           phone?: string | null
+          telegram_id?: string | null
           unit?: string | null
           updated_at?: string | null
         }
