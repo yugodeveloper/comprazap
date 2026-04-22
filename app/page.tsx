@@ -52,7 +52,7 @@ export default function PortalCondominio() {
               ...prev,
               full_name: data.full_name || '',
               unit: data.unit || '',
-              telegram_id: (data as any).telegram_id || ''
+              telegram_id: data.telegram_id || ''
             }));
             setIsLoggedIn(true);
             fetchUserActivity(savedPhone, savedId);
@@ -169,7 +169,7 @@ export default function PortalCondominio() {
             fetchUserActivity(savedProfile.phone, savedProfile.id);
         } else { alert("Senha incorreta!"); } 
       } else { 
-        const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData } as any).select().maybeSingle(); 
+        const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData }).select().maybeSingle(); 
         if (error) throw error; 
         if (!profile) throw new Error("Erro ao criar perfil.");
         localStorage.setItem('user_phone', profile.phone || ''); 
@@ -191,7 +191,7 @@ export default function PortalCondominio() {
           full_name: formData.full_name, 
           unit: formData.unit, 
           telegram_id: formData.telegram_id 
-        } as any)
+        })
         .eq('id', savedProfile.id);
       if (error) throw error;
       setSavedProfile({ ...savedProfile, ...formData });
