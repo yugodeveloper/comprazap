@@ -172,10 +172,10 @@ export default function PortalCondominio() {
         const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData } as any).select().maybeSingle(); 
         if (error) throw error; 
         if (!profile) throw new Error("Erro ao criar perfil.");
-        localStorage.setItem('user_phone', profile.phone); 
+        localStorage.setItem('user_phone', profile.phone || ''); 
         localStorage.setItem('user_id', profile.id); 
         setIsLoggedIn(true); 
-        fetchUserActivity(profile.phone, profile.id);
+        fetchUserActivity(profile.phone || '', profile.id);
       } 
     } catch (error: any) { alert("Erro: " + error.message); } 
     finally { setLoading(false); } 
