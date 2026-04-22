@@ -173,10 +173,11 @@ function NovaCampanhaContent() {
         location_id: finalLocationId
       };
 
-      let campId = editId;
+      let campId: string;
       if (editId) {
         const { error: campErr } = await supabase.from('campaigns').update(payload).eq('id', editId);
         if (campErr) throw campErr;
+        campId = editId;
       } else {
         const { data: camp, error: campErr } = await supabase.from('campaigns').insert(payload).select().single();
         if (campErr || !camp) throw new Error("Erro ao criar campanha.");
