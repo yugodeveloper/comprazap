@@ -184,16 +184,25 @@ export default function PortalCondominio() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    console.log("Tentando atualizar perfil ID:", savedProfile.id, "com os dados:", formData);
+    
     try {
-      const { error } = await supabase
+      const { data, error, count } = await supabase
         .from('profiles')
         .update({ 
           full_name: formData.full_name, 
           unit: formData.unit, 
           telegram_id: formData.telegram_id 
         })
-        .eq('id', savedProfile.id);
+        .eq('id', savedProfile.id)
+        .select(); // Adicionamos select para confirmar o retorno
+
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error("Nenhuma linha foi atualizada. Verifique as políticas de RLS no Supabase.");
+      }
+
       setSavedProfile({ ...savedProfile, ...formData });
       setIsEditingProfile(false);
       alert("Perfil atualizado! ✅");
