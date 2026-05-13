@@ -9,6 +9,7 @@ export default function PortalCondominio() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'phone' | 'login' | 'signup'>('phone')
   const [configError, setConfigError] = useState<string | null>(null)
+  const [dbError, setDbError] = useState<string | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   
   const [formData, setFormData] = useState({ 
@@ -45,8 +46,10 @@ export default function PortalCondominio() {
             .select('*')
             .eq('id', savedId)
             .maybeSingle();
-
-          if (data && !error) {
+            
+          if (error) throw error;
+          if (data) {
+            setDbError(null);
             setSavedProfile(data);
             setFormData(prev => ({
               ...prev,
@@ -61,6 +64,9 @@ export default function PortalCondominio() {
           }
         } catch (err) {
           console.error("Erro na sessão:", err);
+          if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            setDbError("O servidor está acordando ou offline. Tente novamente em 1 minuto.");
+          }
         } finally {
           setLoading(false);
         }
@@ -142,12 +148,19 @@ export default function PortalCondominio() {
   const handleCheckPhone = async () => { 
     if (phone.length < 14) return alert("Telefone inválido"); 
     setLoading(true); 
-    try { 
-      const { data: profile, error } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle(); 
+    try {
+      const { data: profile, error } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle();
       if (error) throw error;
-      if (profile) { setSavedProfile(profile); setView('login'); } 
-      else { setView('signup'); } 
-    } catch (error: any) { alert("Erro: " + error.message); } 
+      setDbError(null);
+      if (profile) { setSavedProfile(profile); setView('login'); }
+      else { setView('signup'); }
+    } catch (error: any) { 
+      if (error.message === 'Failed to fetch') {
+        setDbError("O servidor está acordando. Tente novamente em breve.");
+      } else {
+        alert("Erro: " + error.message);
+      }
+    } 
     finally { setLoading(false); } 
   }
 
@@ -166,18 +179,26 @@ export default function PortalCondominio() {
               unit: savedProfile.unit || '',
               telegram_id: savedProfile.telegram_id || ''
             }));
+            setDbError(null);
             fetchUserActivity(savedProfile.phone, savedProfile.id);
         } else { alert("Senha incorreta!"); } 
       } else { 
         const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData }).select().maybeSingle(); 
-        if (error) throw error; 
+        if (error) throw error;
         if (!profile) throw new Error("Erro ao criar perfil.");
         localStorage.setItem('user_phone', profile.phone || ''); 
         localStorage.setItem('user_id', profile.id); 
         setIsLoggedIn(true); 
+        setDbError(null);
         fetchUserActivity(profile.phone || '', profile.id);
       } 
-    } catch (error: any) { alert("Erro: " + error.message); } 
+    } catch (error: any) {
+      if (error.message === 'Failed to fetch') {
+        setDbError("Conexão perdida. O servidor pode estar reiniciando.");
+      } else {
+        alert("Erro: " + error.message);
+      }
+    } 
     finally { setLoading(false); } 
   }
 
@@ -222,6 +243,14 @@ export default function PortalCondominio() {
         <h1 style={{ fontSize: '36px', fontWeight: '900', fontStyle: 'italic', margin: '0', color: '#0c0a09' }}>CompraZap⚡</h1>
         <p style={{ fontSize: '9px', fontWeight: 'bold', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '40px' }}>Portal Lanai</p>
         <div style={{ width: '100%', maxWidth: '300px' }}>
+          {dbError && (
+            <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', padding: '12px', borderRadius: '12px', marginBottom: '20px', textAlign: 'center' }}>
+              <p style={{ fontSize: '11px', color: '#9a3412', fontWeight: 'bold', margin: 0 }}>
+                ⚠️ {dbError}
+              </p>
+              <button onClick={() => window.location.reload()} style={{ background: 'none', border: 'none', color: '#9a3412', textDecoration: 'underline', fontSize: '10px', cursor: 'pointer', marginTop: '5px', fontWeight: 'bold' }}>Tentar novamente</button>
+            </div>
+          )}
           {view === 'phone' && (
             <>
               <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
