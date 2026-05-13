@@ -350,9 +350,12 @@ export default function PortalCondominio() {
 
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button onClick={() => router.push(`/campanha/gestao/${camp.id}`)} style={{ flex: 2, border: 'none', backgroundColor: isExpired ? '#475569' : '#0c0a09', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>GERENCIAR VENDAS</button>
-                    <button onClick={() => router.push(`/campanha/nova?id=${camp.id}`)} style={{ flex: 1, border: '1px solid #ddd', backgroundColor: isExpired ? '#f8fafc' : 'white', color: '#444', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>EDITAR ✏️</button>
+                    <button onClick={() => router.push(`/campanha/nova?id=${camp.id}`)} style={{ flex: 1, border: '1px solid #ddd', backgroundColor: isExpired ? '#f8fafc' : 'white', color: '#444', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>EDITAR</button>
                     {isExpired ? (
-                      <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '10px', borderRadius: '10px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
+                      <>
+                        <button onClick={() => handleReactivate(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#059669', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>REABRIR</button>
+                        <button onClick={() => router.push(`/campanha/nova?cloneId=${camp.id}`)} style={{ flex: 1, border: 'none', backgroundColor: '#e2e8f0', color: '#475569', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>DUPLICAR 📑</button>
+                      </>
                     ) : (
                       <button onClick={() => handleEndCampaign(camp.id)} style={{ flex: 1, border: 'none', backgroundColor: '#fef2f2', color: '#ef4444', padding: '8px', borderRadius: '8px', fontSize: '8px', fontWeight: '900', cursor: 'pointer' }}>ENCERRAR</button>
                     )}

@@ -8,6 +8,7 @@ function NovaCampanhaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
+  const cloneId = searchParams.get('cloneId')
   
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState('')
@@ -33,7 +34,7 @@ function NovaCampanhaContent() {
 
   // --- LÓGICA DE RESET AUTOMÁTICO ---
   useEffect(() => {
-    if (!editId) {
+    if (!editId && !cloneId) {
       setTitle('');
       setDescription('');
       setPixKey('');
@@ -46,7 +47,7 @@ function NovaCampanhaContent() {
       setLocationName('');
       setSelectedLocationId(null);
     }
-  }, [editId]);
+  }, [editId, cloneId]);
 
   useEffect(() => {
     const fetchLocs = async () => {
@@ -69,12 +70,13 @@ function NovaCampanhaContent() {
   }, [locationName, allLocations, selectedLocationId]);
 
   useEffect(() => {
-    if (editId) {
+    const targetId = editId || cloneId;
+    if (targetId) {
       const loadEditData = async () => {
         const { data: camp, error } = await supabase
           .from('campaigns')
           .select('*, products(*), locations(id, name)')
-          .eq('id', editId)
+          .eq('id', targetId)
           .single();
 
         if (camp && !error) {
@@ -82,7 +84,14 @@ function NovaCampanhaContent() {
           setDescription(camp.description || '');
           setPixKey(camp.pix_key || '');
           if (camp.expires_at) {
-            setExpiresAt(new Date(camp.expires_at).toLocaleDateString('pt-BR'));
+            if (cloneId) {
+              // Sugere uma nova data para o clone (ex: daqui 7 dias)
+              const nextWeek = new Date();
+              nextWeek.setDate(nextWeek.getDate() + 7);
+              setExpiresAt(nextWeek.toLocaleDateString('pt-BR'));
+            } else {
+              setExpiresAt(new Date(camp.expires_at).toLocaleDateString('pt-BR'));
+            }
           }
           setMaxSales(camp.max_sales?.toString() || '50');
           setHeaderImg(camp.image_url || '');
@@ -115,7 +124,7 @@ function NovaCampanhaContent() {
       };
       loadEditData();
     }
-  }, [editId]);
+  }, [editId, cloneId]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'header' | 'share' | 'gallery') => {
     if (!e.target.files || e.target.files.length === 0) return
