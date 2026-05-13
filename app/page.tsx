@@ -64,7 +64,7 @@ export default function PortalCondominio() {
           }
         } catch (err) {
           console.error("Erro na sessão:", err);
-          if (err instanceof TypeError && err.message === 'Failed to fetch') {
+          if (err?.message?.includes('fetch') || err?.name === 'TypeError') {
             setDbError("O servidor está acordando ou offline. Tente novamente em 1 minuto.");
           }
         } finally {
@@ -155,7 +155,8 @@ export default function PortalCondominio() {
       if (profile) { setSavedProfile(profile); setView('login'); }
       else { setView('signup'); }
     } catch (error: any) { 
-      if (error.message === 'Failed to fetch') {
+      const isNetworkError = error.message?.includes('fetch') || error.name === 'TypeError';
+      if (isNetworkError) {
         setDbError("O servidor está acordando. Tente novamente em breve.");
       } else {
         alert("Erro: " + error.message);
@@ -193,7 +194,8 @@ export default function PortalCondominio() {
         fetchUserActivity(profile.phone || '', profile.id);
       } 
     } catch (error: any) {
-      if (error.message === 'Failed to fetch') {
+      const isNetworkError = error.message?.includes('fetch') || error.name === 'TypeError';
+      if (isNetworkError) {
         setDbError("Conexão perdida. O servidor pode estar reiniciando.");
       } else {
         alert("Erro: " + error.message);
