@@ -62,7 +62,7 @@ export default function PortalCondominio() {
           } else {
             localStorage.clear();
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Erro na sessão:", err);
           if (err?.message?.includes('fetch') || err?.name === 'TypeError') {
             setDbError("O servidor está acordando ou offline. Tente novamente em 1 minuto.");
