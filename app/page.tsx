@@ -63,7 +63,7 @@ export default function PortalCondominio() {
             localStorage.clear();
           }
         } catch (err: any) {
-          console.error("Erro na sessão:", err);
+          console.error("DEBUG CompraZap - Falha de Conexão Supabase:", err);
           if (err?.message?.includes('fetch') || err?.name === 'TypeError') {
             setDbError("O servidor está acordando ou offline. Tente novamente em 1 minuto.");
           }
@@ -155,11 +155,12 @@ export default function PortalCondominio() {
       if (profile) { setSavedProfile(profile); setView('login'); }
       else { setView('signup'); }
     } catch (error: any) { 
+      console.error("DEBUG CompraZap - Erro ao checar telefone:", error);
       const isNetworkError = error.message?.includes('fetch') || error.name === 'TypeError';
       if (isNetworkError) {
         setDbError("O servidor está acordando. Tente novamente em breve.");
       } else {
-        alert("Erro: " + error.message);
+        alert("Erro de Sistema: " + error.message);
       }
     } 
     finally { setLoading(false); } 
@@ -194,6 +195,7 @@ export default function PortalCondominio() {
         fetchUserActivity(profile.phone || '', profile.id);
       } 
     } catch (error: any) {
+      console.error("DEBUG CompraZap - Erro na autenticação:", error);
       const isNetworkError = error.message?.includes('fetch') || error.name === 'TypeError';
       if (isNetworkError) {
         setDbError("Conexão perdida. O servidor pode estar reiniciando.");
