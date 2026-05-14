@@ -28,6 +28,8 @@ export default function PortalCondominio() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
+    console.log("DEBUG CompraZap - Conectando em:", `|${url}|`); // Os pipes | ajudam a ver espaços extras
+
     if (!url || !key) {
       setConfigError("Erro de Configuração: Chaves do Supabase não encontradas.");
       return;
@@ -155,6 +157,11 @@ export default function PortalCondominio() {
       if (profile) { setSavedProfile(profile); setView('login'); }
       else { setView('signup'); }
     } catch (error: any) {
+      console.error("DEBUG CompraZap - Objeto de erro completo:", error);
+      if (error.message === "Failed to fetch") {
+        console.error("ERRO DE REDE: O domínio do Supabase não responde. Verifique sua conexão ou o status do projeto no dashboard do Supabase.");
+      }
+
       console.error("DEBUG CompraZap - Erro detalhado:", {
         message: error.message,
         code: error.code,
