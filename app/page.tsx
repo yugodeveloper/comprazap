@@ -155,6 +155,7 @@ export default function PortalCondominio() {
       if (profile) { setSavedProfile(profile); setView('login'); }
       else { setView('signup'); }
     } catch (error: any) {
+      console.log("DEBUG CompraZap - URL utilizada:", process.env.NEXT_PUBLIC_SUPABASE_URL);
       console.error("DEBUG CompraZap - Erro ao checar telefone:", {
         message: error.message,
         code: error.code,
