@@ -154,8 +154,14 @@ export default function PortalCondominio() {
       setDbError(null);
       if (profile) { setSavedProfile(profile); setView('login'); }
       else { setView('signup'); }
-    } catch (error: any) { 
-      console.error("DEBUG CompraZap - Erro ao checar telefone:", error);
+    } catch (error: any) {
+      console.error("DEBUG CompraZap - Erro ao checar telefone:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+
       const isNetworkError = error.message?.includes('fetch') || error.name === 'TypeError';
       if (isNetworkError) {
         setDbError("O servidor está acordando. Tente novamente em breve.");
@@ -184,8 +190,13 @@ export default function PortalCondominio() {
             setDbError(null);
             fetchUserActivity(savedProfile.phone, savedProfile.id);
         } else { alert("Senha incorreta!"); } 
-      } else { 
-        const { data: profile, error } = await supabase.from('profiles').upsert({ phone, ...formData }).select().maybeSingle(); 
+      } else {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .upsert({ phone, ...formData })
+          .select()
+          .maybeSingle();
+
         if (error) throw error;
         if (!profile) throw new Error("Erro ao criar perfil.");
         localStorage.setItem('user_phone', profile.phone || ''); 
@@ -193,7 +204,7 @@ export default function PortalCondominio() {
         setIsLoggedIn(true); 
         setDbError(null);
         fetchUserActivity(profile.phone || '', profile.id);
-      } 
+      }
     } catch (error: any) {
       console.error("DEBUG CompraZap - Erro na autenticação:", error);
       const isNetworkError = error.message?.includes('fetch') || error.name === 'TypeError';
