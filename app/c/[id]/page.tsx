@@ -82,6 +82,30 @@ function LandingContent() {
     }
   };
 
+  // Auxiliar para identificar o tipo de mídia e renderizar corretamente
+  const renderMedia = (url: string) => {
+    const isVideoFile = url.match(/\.(mp4|webm|ogg|mov)$/i);
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const isInstagram = url.includes('instagram.com');
+
+    if (isVideoFile) {
+      return <video src={url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
+    }
+
+    if (isYouTube) {
+      const videoId = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
+      return <iframe src={`https://www.youtube.com/embed/${videoId}`} style={{ width: '100%', height: '100%', borderRadius: '20px' }} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />;
+    }
+
+    if (isInstagram) {
+      // Converte link de post/reel para formato de embed
+      const cleanUrl = url.split('?')[0].replace(/\/$/, "");
+      return <iframe src={`${cleanUrl}/embed`} style={{ width: '100%', height: '100%', borderRadius: '20px' }} frameBorder="0" scrolling="no" allowTransparency={true} />;
+    }
+
+    return <img src={url} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />;
+  };
+
   useEffect(() => {
     if (gallery.length <= 1 || isPaused) return;
     const interval = setInterval(() => {
@@ -378,7 +402,7 @@ function LandingContent() {
               >
                 {loopItems.map((img: string, i: number) => (
                   <div key={i} style={{ minWidth: '100%', width: '100%', height: '400px', scrollSnapAlign: 'start', flexShrink: 0, backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
+                    {renderMedia(img)}
                   </div>
                 ))}
               </div>

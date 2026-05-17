@@ -20,6 +20,7 @@ function NovaCampanhaContent() {
   const [headerImg, setHeaderImg] = useState('')
   const [shareImg, setShareImg] = useState('') 
   const [gallery, setGallery] = useState<string[]>([])
+  const [externalUrl, setExternalUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [variations, setVariations] = useState([{ name: '', price: '' }])
 
@@ -155,6 +156,13 @@ function NovaCampanhaContent() {
     setVariations(newVars);
   }
 
+  const addExternalLink = () => {
+    if (!externalUrl) return;
+    if (gallery.length >= 10) return alert("Limite de 10 mídias atingido");
+    setGallery([...gallery, externalUrl]);
+    setExternalUrl('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -272,19 +280,27 @@ function NovaCampanhaContent() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria (Até 5)</label>
+            <label style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>Galeria (Até 10 fotos/vídeos)</label>
             <div style={{ display: 'flex', gap: '10px', overflowX: 'auto' }}>
                 {gallery.map((img, i) => (
                   <div key={i} style={{ width: '80px', height: '110px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                    <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    {img.match(/\.(mp4|webm|ogg|mov)$/i) || img.includes('youtube.com') || img.includes('youtu.be') || img.includes('instagram.com') ? (
+                      <div style={{ width: '100%', height: '100%', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎬</div>
+                    ) : (
+                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    )}
                     <button type="button" onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px' }}>✕</button>
                   </div>
                 ))}
-                {gallery.length < 5 && (
+                {gallery.length < 10 && (
                   <label style={{ width: '80px', height: '110px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, backgroundColor: 'white' }}>
-                    <input type="file" multiple accept="image/*" hidden onChange={(e) => handleUpload(e, 'gallery')} /><span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
+                    <input type="file" multiple accept="image/*,video/*" hidden onChange={(e) => handleUpload(e, 'gallery')} /><span style={{ fontSize: '16px', color: '#94a3b8' }}>+</span>
                   </label>
                 )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
+              <input placeholder="Ou cole link YouTube/Reels..." style={{ ...inputStyle, padding: '10px', fontSize: '12px' }} value={externalUrl} onChange={e => setExternalUrl(e.target.value)} />
+              <button type="button" onClick={addExternalLink} style={{ padding: '0 15px', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>ADD LINK</button>
             </div>
           </div>
 
