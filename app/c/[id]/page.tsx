@@ -255,12 +255,38 @@ function LandingContent() {
 
   const concluirPedido = async () => {
     if (!buyerName || !buyerApto) return alert("Preencha Nome e Unidade");
+    if (!product?.id) return alert("Erro: Produto não carregado. Recarregue a página.");
+    
     setLoading(true);
-    const orderData = { campaign_id: id, product_id: product.id, buyer_contact: contact, buyer_name: buyerName, buyer_apto: buyerApto, quantity: 1, selected_variations: itemsList, status: 'pending', observations: observations };
-    const { data: savedOrder } = await supabase.from('orders').upsert(existingOrder?.id ? { id: existingOrder.id, ...orderData } : orderData).select().single();
-    setExistingOrder(savedOrder); setOrderStatus(savedOrder?.status || 'pending');
-    await enviarNotificacaoTelegram(savedOrder, itemsList);
-    setStep('concluido'); setLoading(false);
+    try {
+      const orderData = { 
+        campaign_id: id, 
+        product_id: product.id, 
+        buyer_contact: contact, 
+        buyer_name: buyerName, 
+        buyer_apto: buyerApto, 
+        quantity: 1, 
+        selected_variations: itemsList, 
+        status: 'pending', 
+        observations: observations 
+      };
+      
+      const { data: savedOrder, error } = await supabase.from('orders').upsert(existingOrder?.id ? { id: existingOrder.id, ...orderData } : orderData).select().single();
+      if (error) throw error;
+
+      setExistingOrder(savedOrder); 
+      setOrderStatus(savedOrder?.status || 'pending');
+      
+      // Notificação em background (sem await para não travar a UI)
+      enviarNotificacaoTelegram(savedOrder, itemsList).catch(err => console.error("Falha notificação:", err));
+      
+      setStep('concluido');
+    } catch (err: any) {
+      console.error("Erro ao concluir pedido:", err);
+      alert("Erro ao salvar pedido: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancelarCompra = async () => {
@@ -284,17 +310,25 @@ function LandingContent() {
     if (!e.target.files || !existingOrder) return;
     setUploading(true);
     const file = e.target.files[0];
-    const fileName = `receipts/${existingOrder.id}-${Date.now()}`;
-    await supabase.storage.from('comprovantes').upload(fileName, file);
-    const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
-    await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
-    setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
-    setOrderStatus('pending');
-    
-    await enviarNotificacaoTelegram(existingOrder, itemsList, publicUrl);
-    
-    alert("Comprovante enviado! ✅");
-    setUploading(false);
+    try {
+      const fileName = `receipts/${existingOrder.id}-${Date.now()}`;
+      const { error: uploadError } = await supabase.storage.from('comprovantes').upload(fileName, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
+      const { error: dbError } = await supabase.from('orders').update({ receipt_url: publicUrl, status: 'pending' }).eq('id', existingOrder.id);
+      if (dbError) throw dbError;
+
+      setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
+      setOrderStatus('pending');
+      
+      enviarNotificacaoTelegram(existingOrder, itemsList, publicUrl).catch(err => console.error("Falha notificação comprovante:", err));
+      alert("Comprovante enviado! ✅");
+    } catch (err: any) {
+      alert("Erro no upload: " + err.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const InfoBadge = ({label, value}: {label: string, value: string}) => (
