@@ -63,12 +63,13 @@ function LandingContent() {
   };
 
   // Função para rastrear o progresso do comprador (Lead)
-  const trackLead = async (stepStatus: string, extraData: any = {}) => {
-    if (!contact || !id) return;
+  const trackLead = async (stepStatus: string, extraData: any = {}, phoneOverride?: string) => {
+    const phoneToTrack = phoneOverride || contact;
+    if (!phoneToTrack || !id) return;
     try {
       const payload = {
         campaign_id: id,
-        phone: contact,
+        phone: phoneToTrack,
         status: stepStatus,
         updated_at: new Date().toISOString(),
         ...extraData
@@ -270,11 +271,12 @@ function LandingContent() {
           setOrderStatus(activeOrder.status || 'pending'); 
           setObservations(activeOrder.observations || '');
           setItemsList((activeOrder.selected_variations as any[]) || []); 
+          trackLead('identificado', {}, phoneToAuth);
           setStep('concluido');
           setLoading(false); return;
         }
-        trackLead('identificado');
       }
+      trackLead('identificado', {}, phoneToAuth);
 
       // NOVA REGRA: Se a campanha expirou e não há pedido ativo, não permite avançar
       if (isExpired) {
