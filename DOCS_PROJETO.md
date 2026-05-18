@@ -104,6 +104,9 @@ Para o funcionamento correto da Landing Page pública, as seguintes políticas d
 
 ## ✅ Histórico de Conquistas (Resumo)
 - [x] **Checkout Resiliente (17/05):** Resolvido bug que travava a página em "Carregando oferta" via execução assíncrona do Telegram.
+- [x] **Telegram Test (18/05):** Botão de teste no perfil do vendedor funcional para validar ID.
+- [x] **Fix Galeria (18/05):** Corrigido limite de 10 mídias que estava travado em 5 no upload.
+- [x] **Controle de Autoplay (18/05):** Adicionado botão de Pausa/Play na galeria da Landing Page para melhor visualização de vídeos.
 - [x] **Segurança de Banco (17/05):** Políticas de RLS aplicadas para permitir vendas e uploads por usuários anônimos.
 - [x] **Galeria Multimídia Pro (17/05):** Limite estendido para 10 itens com suporte a Vídeos (.mp4), Instagram Reels e YouTube, com redimensionamento responsivo.
 - [x] **Multi-condomínio:** Agora o sistema suporta vários locais via tabela `locations`.

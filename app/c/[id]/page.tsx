@@ -47,6 +47,7 @@ function LandingContent() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [manualPause, setManualPause] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
 
@@ -143,7 +144,7 @@ function LandingContent() {
   };
 
   useEffect(() => {
-    if (gallery.length <= 1 || isPaused) return;
+    if (gallery.length <= 1 || isPaused || manualPause) return;
     const interval = setInterval(() => {
       if (scrollRef.current) {
         const { clientWidth } = scrollRef.current;
@@ -151,7 +152,7 @@ function LandingContent() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [gallery, isPaused]);
+  }, [gallery, isPaused, manualPause]);
 
   const navScroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -444,10 +445,18 @@ function LandingContent() {
               </div>
               <button onClick={() => navScroll('left')} style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>‹</button>
               <button onClick={() => navScroll('right')} style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', backgroundColor: 'white', border: '1px solid #eee', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>›</button>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 15 }}>
-                {gallery.map((_: any, i: number) => (
-                  <div key={i} style={{ width: activeIndex === i ? 18 : 6, height: 6, borderRadius: '10px', backgroundColor: '#059669', opacity: activeIndex === i ? 1 : 0.2, transition: 'all 0.3s ease' }}></div>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 15, marginTop: 15 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {gallery.map((_: any, i: number) => (
+                    <div key={i} style={{ width: activeIndex === i ? 18 : 6, height: 6, borderRadius: '10px', backgroundColor: '#059669', opacity: activeIndex === i ? 1 : 0.2, transition: 'all 0.3s ease' }}></div>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => setManualPause(!manualPause)}
+                  style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#64748b', fontWeight: '900', padding: '4px 10px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase' }}
+                >
+                  {manualPause ? '▶️ Play' : '⏸️ Pausa'}
+                </button>
               </div>
             </div>
           )}
