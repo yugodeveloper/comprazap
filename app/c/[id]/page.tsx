@@ -62,6 +62,27 @@ function LandingContent() {
     }
   };
 
+  // Função para rastrear o progresso do comprador (Lead)
+  const trackLead = async (stepStatus: string, extraData: any = {}) => {
+    if (!contact || !id) return;
+    try {
+      const payload = {
+        campaign_id: id,
+        phone: contact,
+        status: stepStatus,
+        updated_at: new Date().toISOString(),
+        ...extraData
+      };
+      await supabase.from('campaign_leads').upsert(payload, { onConflict: 'campaign_id, phone' });
+    } catch (e) {
+      console.error("Erro ao rastrear lead:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (step === 'itens' && itemsList.length > 0) trackLead('selecionou_itens');
+  }, [itemsList, step]);
+
   const gallery = campaign?.image_gallery || [];
   const loopItems = gallery.length > 1 ? [gallery[gallery.length - 1], ...gallery, gallery[0]] : gallery;
 
@@ -252,6 +273,7 @@ function LandingContent() {
           setStep('concluido');
           setLoading(false); return;
         }
+        trackLead('identificado');
       }
 
       // NOVA REGRA: Se a campanha expirou e não há pedido ativo, não permite avançar
@@ -295,6 +317,11 @@ function LandingContent() {
 
       if (!cp) return;
       setCampaign(cp);
+      
+      // Incrementa views (simples)
+      if (typeof window !== 'undefined') {
+        await supabase.from('campaigns').update({ views: (cp.views || 0) + 1 }).eq('id', id);
+      }
 
       const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
       
@@ -341,6 +368,7 @@ function LandingContent() {
       // Notificação em background (sem await para não travar a UI)
       enviarNotificacaoTelegram(savedOrder, itemsList).catch(err => console.error("Falha notificação:", err));
       
+      await trackLead('pedido_concluido', { name: buyerName, unit: buyerApto });
       setStep('concluido');
     } catch (err: any) {
       console.error("Erro ao concluir pedido:", err);
@@ -384,6 +412,7 @@ function LandingContent() {
       setOrderStatus('pending');
       
       enviarNotificacaoTelegram(existingOrder, itemsList, publicUrl).catch(err => console.error("Falha notificação comprovante:", err));
+      await trackLead('comprovante_enviado');
       alert("Comprovante enviado! ✅");
     } catch (err: any) {
       alert("Erro no upload: " + err.message);

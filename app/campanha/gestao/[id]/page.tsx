@@ -13,7 +13,8 @@ export default function GestaoCampanha() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedImg, setSelectedImg] = useState<string | null>(null)
-  const [showReport, setShowReport] = useState(false)
+  const [showReport, setShowReport] = useState<'production' | 'leads' | null>(null)
+  const [leads, setLeads] = useState<any[]>([])
 
   const fetchData = async () => {
     if (!id) return
@@ -27,6 +28,10 @@ export default function GestaoCampanha() {
         .eq('campaign_id', id)
         .order('created_at', { ascending: false })
       setOrders(ords || [])
+
+      const { data: ld } = await supabase.from('campaign_leads').select('*').eq('campaign_id', id).order('updated_at', { ascending: false });
+      setLeads(ld || []);
+
     } catch (err) {
       console.error("Erro ao carregar gestão:", err)
     } finally {
@@ -99,12 +104,46 @@ export default function GestaoCampanha() {
         
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', fontSize: '10px', fontWeight: '900', color: '#a8a29e', textTransform: 'uppercase' }}>← Painel</button>
-          <button onClick={() => setShowReport(!showReport)} style={{ fontSize: '9px', fontWeight: '900', backgroundColor: showReport ? '#ef4444' : '#059669', color: 'white', padding: '8px 15px', borderRadius: '50px', border: 'none' }}>
-            {showReport ? 'FECHAR RELATÓRIO' : 'RELATÓRIO DE ENTREGAS 📋'}
+          <button onClick={() => setShowReport(showReport === 'production' ? null : 'production')} style={{ fontSize: '9px', fontWeight: '900', backgroundColor: showReport === 'production' ? '#ef4444' : '#059669', color: 'white', padding: '8px 15px', borderRadius: '50px', border: 'none' }}>
+            {showReport === 'production' ? 'FECHAR RELATÓRIO' : 'ENTREGAS 📋'}
           </button>
         </header>
 
-        {showReport ? (
+        {showReport === 'leads' && (
+          <div style={{ animation: 'fadein 0.3s', backgroundColor: 'white', padding: '20px', borderRadius: '25px', border: '1px solid #f5f5f4', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '900' }}>Quem visitou a página</h2>
+              <button onClick={() => setShowReport(null)} style={{ border: 'none', background: 'none', fontWeight: 900, color: '#ef4444' }}>✕</button>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '2px solid #f1f5f9' }}>
+                    <th style={{ padding: '10px 5px' }}>TELEFONE</th>
+                    <th style={{ padding: '10px 5px' }}>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map(lead => (
+                    <tr key={lead.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 5px' }}>
+                        <a href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ color: '#059669', textDecoration: 'none', fontWeight: 'bold' }}>
+                          {lead.phone} 📱
+                        </a>
+                        {lead.name && <div style={{ fontSize: '9px', color: '#94a3b8' }}>{lead.name} ({lead.unit})</div>}
+                      </td>
+                      <td style={{ padding: '10px 5px', fontWeight: 'bold', textTransform: 'uppercase', color: lead.status === 'comprovante_enviado' ? '#059669' : '#64748b' }}>
+                        {lead.status.replace('_', ' ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {showReport === 'production' ? (
           <div style={{ animation: 'fadein 0.3s' }}>
             <div style={{ ...cardStyle, border: '2px solid #059669' }}>
               <h2 style={{ fontSize: '16px', fontWeight: '900', marginBottom: '15px' }}>Lista de Produção</h2>
@@ -134,10 +173,10 @@ export default function GestaoCampanha() {
             <div style={{ ...cardStyle, textAlign: 'center' }}>
               <h1 style={{ fontSize: '20px', fontWeight: '900', marginBottom: '15px' }}>{campaign?.title}</h1>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                <div style={{ backgroundColor: '#f5f5f4', padding: '10px', borderRadius: '15px' }}>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px' }}>{campaign?.views || 0}</p>
-                  <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>VIEWS</p>
-                </div>
+                <button onClick={() => setShowReport('leads')} style={{ backgroundColor: '#f5f5f4', padding: '10px', borderRadius: '15px', border: 'none', cursor: 'pointer' }}>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#1e293b' }}>{leads.length}</p>
+                  <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>VISITANTES 👥</p>
+                </button>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '15px' }}>
                   <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#059669' }}>{orders.filter(o => o.status !== 'cancelled').length}</p>
                   <p style={{ margin: 0, fontSize: '7px', fontWeight: '900', color: '#a8a29e' }}>PEDIDOS</p>

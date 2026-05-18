@@ -63,6 +63,14 @@ O CompraZap é uma plataforma de "Social Commerce" hiper-local, focada em facili
 - `status` (text) - 'pending', 'paid', 'rejected', 'cancelled'.
 - `receipt_url` (text) - Link para o Supabase Storage.
 
+### Tabela: `campaign_leads` (Novo)
+- `id` (uuid, PK)
+- `campaign_id` (uuid, FK)
+- `phone` (text)
+- `name`, `unit` (text)
+- `status` (text) - 'identificado', 'selecionou_itens', 'pedido_concluido', 'comprovante_enviado'.
+- `updated_at` (timestamp)
+
 ### Tabela: `locations`
 - `id` (uuid, PK)
 - `name` (text) - Nome do condomínio/local.
@@ -104,6 +112,7 @@ Para o funcionamento correto da Landing Page pública, as seguintes políticas d
 
 ## ✅ Histórico de Conquistas (Resumo)
 - [x] **Checkout Resiliente (17/05):** Resolvido bug que travava a página em "Carregando oferta" via execução assíncrona do Telegram.
+- [x] **Lead Tracking (18/05):** Sistema de rastreio de visitantes com relatório detalhado e WhatsApp link no painel de gestão.
 - [x] **Telegram Test (18/05):** Botão de teste no perfil do vendedor funcional para validar ID.
 - [x] **Fix Galeria (18/05):** Corrigido limite de 10 mídias que estava travado em 5 no upload.
 - [x] **Controle de Autoplay (18/05):** Adicionado botão de Pausa/Play na galeria da Landing Page para melhor visualização de vídeos.
