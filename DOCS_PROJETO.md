@@ -5,7 +5,7 @@ O CompraZap é uma plataforma de "Social Commerce" hiper-local, focada em facili
 
 ### 🏗 Arquitetura Técnica
 - **Frontend:** Next.js 14+ (App Router) com TypeScript.
-- **Estilização:** Inline CSS (estilo modular) para garantir que as páginas carreguem rápido em redes móveis (4G/5G).
+- **Estilização:** Inline CSS (estilo modular) para performance e portabilidade.
 - **Backend/Database:** Supabase (PostgreSQL) com Real-time (para status de pedidos) e Storage (para comprovantes).
 - **Notificações:** Integração resiliente com a API de Bots do Telegram.
 - **Hospedagem:** Vercel (Build automático via Git).
@@ -102,15 +102,16 @@ Para o funcionamento correto da Landing Page pública, as seguintes políticas d
 ---
 
 ## ✅ Histórico de Conquistas (Resumo)
+- [x] **Checkout Resiliente (17/05):** Resolvido bug que travava a página em "Carregando oferta" via execução assíncrona do Telegram.
+- [x] **Segurança de Banco (17/05):** Políticas de RLS aplicadas para permitir vendas e uploads por usuários anônimos.
+- [x] **Galeria Multimídia Pro (17/05):** Limite estendido para 10 itens com suporte a Vídeos (.mp4), Instagram Reels e YouTube.
 - [x] **Multi-condomínio:** Agora o sistema suporta vários locais via tabela `locations`.
 - [x] **Clonagem de Campanha:** Botão de duplicar funcional.
-- [x] **Galeria Multimídia:** Cadastro e visualização de até 10 itens (Fotos, Vídeos, Reels e YouTube).
 - [x] **Inteligência de Mídia:** Sistema detecta automaticamente o formato para renderizar o player correto.
 - [x] **Notificação Dinâmica:** O sistema avisa o vendedor certo no Telegram certo.
-- [x] **Checkout Resiliente:** Resolvido bug que travava a página em "Carregando oferta".
 - [ ] **Layout de Impressão:** Adicionar `@media print` no Roteiro de Entregas para gerar PDFs limpos para os entregadores.
 - [ ] **Estoque Limitado:** Adicionar campo `stock_quantity` na tabela de produtos/variações e validar no checkout.
 - [ ] **Criptografia de Senhas:** Migrar senhas de `text` para `hash` no Supabase.
 - [ ] **Notificação de Comprovante:** Melhorar o alerta no Telegram quando o cliente faz o upload do comprovante após o pedido já ter sido criado.
 
-*Documentação atualizada em: 17 de Maio de 2026*
+*Última atualização: 17 de Maio de 2026 - Encerramento do dia com Checkout e Galeria Multimídia estáveis.*

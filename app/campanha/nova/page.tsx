@@ -139,7 +139,7 @@ function NovaCampanhaContent() {
         const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName)
         if (type === 'header') setHeaderImg(publicUrl)
         else if (type === 'share') setShareImg(publicUrl)
-        else setGallery(prev => [...prev, publicUrl].slice(0, 5))
+        else setGallery(prev => [...prev, publicUrl].slice(0, 10))
       }
     }
     setUploading(false)
