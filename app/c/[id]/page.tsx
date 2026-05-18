@@ -73,7 +73,7 @@ function LandingContent() {
         updated_at: new Date().toISOString(),
         ...extraData
       };
-      await supabase.from('campaign_leads').upsert(payload, { onConflict: 'campaign_id, phone' });
+      await supabase.from('campaign_leads' as any).upsert(payload, { onConflict: 'campaign_id, phone' });
     } catch (e) {
       console.error("Erro ao rastrear lead:", e);
     }

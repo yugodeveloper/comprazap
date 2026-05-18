@@ -29,7 +29,7 @@ export default function GestaoCampanha() {
         .order('created_at', { ascending: false })
       setOrders(ords || [])
 
-      const { data: ld } = await supabase.from('campaign_leads').select('*').eq('campaign_id', id).order('updated_at', { ascending: false });
+      const { data: ld } = await supabase.from('campaign_leads' as any).select('*').eq('campaign_id', id).order('updated_at', { ascending: false });
       setLeads(ld || []);
 
     } catch (err) {
