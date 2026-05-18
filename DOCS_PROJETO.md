@@ -26,6 +26,7 @@ O CompraZap é uma plataforma de "Social Commerce" hiper-local, focada em facili
 ### 🔗 Landing Page do Comprador (`app/c/[id]/page.tsx`)
 - **Experiência sem Fricção:** O comprador se identifica apenas pelo telefone (salvo em `localStorage`).
 - **Galeria Multimídia:** Carrossel inteligente que detecta e renderiza Imagens, Vídeos (.mp4), YouTube (Embed) e Instagram Reels (Embed) mantendo a navegação lateral.
+- **Redimensionamento Responsivo:** Conteúdo multimídia (vídeos, embeds) na galeria agora redimensiona automaticamente para se ajustar ao espaço disponível, mantendo o aspecto original e evitando cortes.
 - **Trava de Expiração:** Se a campanha expirou, o sistema impede novos pedidos, mas permite que quem já comprou veja o status e envie o comprovante.
 - **Fluxo de Checkout:**
     1. Seleção de variações (botões em cores pastéis).
@@ -104,7 +105,7 @@ Para o funcionamento correto da Landing Page pública, as seguintes políticas d
 ## ✅ Histórico de Conquistas (Resumo)
 - [x] **Checkout Resiliente (17/05):** Resolvido bug que travava a página em "Carregando oferta" via execução assíncrona do Telegram.
 - [x] **Segurança de Banco (17/05):** Políticas de RLS aplicadas para permitir vendas e uploads por usuários anônimos.
-- [x] **Galeria Multimídia Pro (17/05):** Limite estendido para 10 itens com suporte a Vídeos (.mp4), Instagram Reels e YouTube.
+- [x] **Galeria Multimídia Pro (17/05):** Limite estendido para 10 itens com suporte a Vídeos (.mp4), Instagram Reels e YouTube, com redimensionamento responsivo.
 - [x] **Multi-condomínio:** Agora o sistema suporta vários locais via tabela `locations`.
 - [x] **Clonagem de Campanha:** Botão de duplicar funcional.
 - [x] **Inteligência de Mídia:** Sistema detecta automaticamente o formato para renderizar o player correto.

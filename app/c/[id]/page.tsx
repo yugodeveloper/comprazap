@@ -88,22 +88,58 @@ function LandingContent() {
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
     const isInstagram = url.includes('instagram.com');
 
+    // Estilos base para elementos de mídia se ajustarem ao contêiner
+    const mediaFitStyle: React.CSSProperties = {
+      width: '100%',
+      height: '100%',
+      objectFit: 'contain', // Garante que a mídia inteira seja visível
+      borderRadius: '20px',
+    };
+
     if (isVideoFile) {
-      return <video src={url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
+      return <video src={url} controls playsInline style={mediaFitStyle} />;
     }
 
     if (isYouTube) {
       const videoId = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
-      return <iframe src={`https://www.youtube.com/embed/${videoId}`} style={{ width: '100%', height: '100%', borderRadius: '20px' }} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />;
+      return (
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}`}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          // Para iframes, objectFit não se aplica. Precisamos gerenciar o aspect ratio.
+          // O div pai tem altura fixa de 400px. Queremos que o iframe preencha a altura e mantenha o aspect ratio.
+          style={{
+            width: 'auto', // Deixa a largura ajustar com base no aspect ratio
+            height: '100%', // Preenche a altura do pai (400px)
+            aspectRatio: '16 / 9', // Proporção padrão do YouTube
+            border: 'none',
+            borderRadius: '20px',
+          }}
+        />
+      );
     }
 
     if (isInstagram) {
-      // Converte link de post/reel para formato de embed
       const cleanUrl = url.split('?')[0].replace(/\/$/, "");
-      return <iframe src={`${cleanUrl}/embed`} style={{ width: '100%', height: '100%', borderRadius: '20px' }} frameBorder="0" scrolling="no" allowTransparency={true} />;
+      // Reels do Instagram geralmente têm proporção 4:5 (vídeo vertical).
+      return (
+        <iframe
+          src={`${cleanUrl}/embed`}
+          scrolling="no"
+          allowTransparency={true}
+          style={{
+            width: 'auto', // Deixa a largura ajustar com base no aspect ratio
+            height: '100%', // Preenche a altura do pai (400px)
+            aspectRatio: '4 / 5', // Proporção comum de Reels do Instagram
+            border: 'none',
+            borderRadius: '20px',
+          }}
+        />
+      );
     }
 
-    return <img src={url} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />;
+    return <img src={url} style={mediaFitStyle} alt="" />;
   };
 
   useEffect(() => {
