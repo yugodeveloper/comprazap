@@ -453,9 +453,22 @@ function LandingContent() {
                 </div>
                 <button 
                   onClick={() => setManualPause(!manualPause)}
-                  style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#64748b', fontWeight: '900', padding: '4px 10px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase' }}
+                  style={{ 
+                    background: '#f1f5f9', // Fundo cinza claro para o círculo
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    width: '30px', // Tamanho do círculo
+                    height: '30px', 
+                    borderRadius: '50%', // Transforma em círculo
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '16px', // Tamanho do símbolo
+                    color: '#475569', // Cor do símbolo (cinza escuro)
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)', // Sombra sutil para profundidade
+                  }}
                 >
-                  {manualPause ? '▶️ Play' : '⏸️ Pausa'}
+                  {manualPause ? '▶' : '⏸'}
                 </button>
               </div>
             </div>
