@@ -252,6 +252,23 @@ export default function PortalCondominio() {
     finally { setLoading(false); }
   }
 
+  const handleTestTelegram = async () => {
+    if (!formData.telegram_id) return alert("Preencha o ID do Telegram primeiro.");
+    const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    if (!token) return alert("Erro: Token do bot não configurado.");
+
+    try {
+      const msg = "🔔 *CompraZap ⚡*\n\nTeste de configuração efetuado com sucesso! Você receberá os avisos de novos pedidos e comprovantes por aqui.";
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: formData.telegram_id, text: msg, parse_mode: 'Markdown' })
+      });
+      if (res.ok) alert("Mensagem de teste enviada! Confira seu Telegram. ✅");
+      else alert("Erro ao enviar. Verifique se o ID está correto e se você já iniciou uma conversa com o bot. ❌");
+    } catch (err) { alert("Erro na conexão com o Telegram."); }
+  };
+
   const inputStyle: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#f5f5f4', borderRadius: '15px', border: '1px solid #e7e5e4', outline: 'none', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box', marginBottom: '10px' };
   const btnEmerald: React.CSSProperties = { width: '100%', padding: '15px', backgroundColor: '#059669', color: 'white', borderRadius: '50px', border: 'none', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', cursor: 'pointer' };
   const recoveryStyle: React.CSSProperties = { display: 'block', textAlign: 'center', marginTop: '15px', fontSize: '12px', color: '#a8a29e', textDecoration: 'underline', cursor: 'pointer', fontWeight: '600' };
@@ -333,8 +350,11 @@ export default function PortalCondominio() {
             <form onSubmit={handleUpdateProfile}>
               <input placeholder="Nome Completo" required style={inputStyle} value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
               <input placeholder="Unidade (Apto)" required style={inputStyle} value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
-              <input placeholder="ID Telegram" style={inputStyle} value={formData.telegram_id} onChange={e => setFormData({...formData, telegram_id: e.target.value})} />
-              <p style={{ fontSize: '9px', color: '#a8a29e', marginBottom: '15px', textAlign: 'center' }}>Receba avisos de vendas via @userinfobot no Telegram</p>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
+                <input placeholder="ID Telegram" style={{ ...inputStyle, marginBottom: 0 }} value={formData.telegram_id} onChange={e => setFormData({...formData, telegram_id: e.target.value})} />
+                <button type="button" onClick={handleTestTelegram} style={{ padding: '0 15px', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '15px', fontSize: '10px', fontWeight: '900', cursor: 'pointer' }}>TESTAR</button>
+              </div>
+              <p style={{ fontSize: '9px', color: '#a8a29e', marginBottom: '15px', textAlign: 'center' }}>ID via @userinfobot. <b>Importante:</b> Você precisa dar /start no bot do CompraZap.</p>
               <button type="submit" style={btnEmerald} disabled={loading}>{loading ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES'}</button>
             </form>
           </section>
