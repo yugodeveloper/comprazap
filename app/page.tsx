@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
+import { maskPhone } from './lib/utils' // Importar a função maskPhone do arquivo de utilitários
 import { useRouter } from 'next/navigation'
 
 export default function PortalCondominio() {
@@ -138,13 +139,6 @@ export default function PortalCondominio() {
     setLoading(false);
   };
 
-  const formatPhone = (v: string) => { 
-    v = v.replace(/\D/g, ""); 
-    v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); 
-    v = v.replace(/(\d{5})(\d)/, "$1-$2"); 
-    return v.substring(0, 15); 
-  }
-  
   const handleCheckPhone = async () => { 
     if (phone.length < 14) return alert("Telefone inválido"); 
     setLoading(true); 
@@ -291,7 +285,7 @@ export default function PortalCondominio() {
           )}
           {view === 'phone' && (
             <>
-              <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))}/>
+              <input type="tel" placeholder="(00) 00000-0000" style={{ ...inputStyle, fontSize: '20px' }} value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))}/>
               <button onClick={handleCheckPhone} style={btnEmerald}>{loading ? '...' : 'ENTRAR'}</button>
               <a href={`https://wa.me/5548991694249?text=Olá Gustavo! Esqueci minha senha do CompraZap. Meu telefone é ${phone}`} target="_blank" rel="noreferrer" style={recoveryStyle}>Esqueci minha senha</a>
             </>

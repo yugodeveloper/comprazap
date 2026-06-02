@@ -1,8 +1,9 @@
 'use client'
 
 import { supabase } from '../../lib/supabase'
-import { useEffect, useState, Suspense, useRef } from 'react'
+import { useEffect, useState, Suspense, useRef, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
+import ProductVariationsDisplay from './ProductVariationsDisplay'; // Import the new component
 import { QRCodeSVG } from 'qrcode.react'
 
 function LandingContent() {
@@ -34,17 +35,6 @@ function LandingContent() {
   // Verificação se a campanha está expirada
   const isExpired = campaign?.expires_at ? new Date(campaign.expires_at) < new Date() : false;
 
-  // Paleta de cores pastéis para os botões de itens (tons suaves que não conflitam com o verde)
-  const pastelColors = [
-    '#F0F4FF', // Azul pastel
-    '#FFF1F2', // Rosa suave
-    '#FEFCE8', // Amarelo palha
-    '#F5F3FF', // Lavanda
-    '#F0FDFA', // Turquesa claro
-    '#FFF7ED', // Laranja suave
-    '#F8FAFC', // Cinza azulado
-  ];
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [manualPause, setManualPause] = useState(false);
@@ -52,9 +42,11 @@ function LandingContent() {
   const [isReady, setIsReady] = useState(false);
 
   const maskPhone = (value: string) => {
-    return value.replace(/\D/g, "").replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").replace(/(-\d{4})(\d+?)$/, "$1");
+    let r = value.replace(/\D/g, "");
+    r = r.replace(/^(\d{2})(\d)/g, "($1) $2");
+    r = r.replace(/(\d{5})(\d)/, "$1-$2");
+    return r.substring(0, 15);
   };
-
   const copyPix = () => {
     if (campaign?.pix_key) {
       navigator.clipboard.writeText(campaign.pix_key);
@@ -62,7 +54,7 @@ function LandingContent() {
     }
   };
 
-  // Função para rastrear o progresso do comprador (Lead)
+  // Função para rastrear o progresso do comprador (Lead) - Memoized para evitar recriação desnecessária
   const trackLead = async (stepStatus: string, extraData: any = {}, phoneOverride?: string) => {
     const phoneToTrack = phoneOverride || contact;
     if (!phoneToTrack || !id) return;
@@ -77,7 +69,7 @@ function LandingContent() {
       await supabase.from('campaign_leads' as any).upsert(payload, { onConflict: 'campaign_id, phone' });
     } catch (e) {
       console.error("Erro ao rastrear lead:", e);
-    }
+    } // Não há necessidade de memoizar esta função, pois ela não é passada como prop para componentes filhos
   };
 
   useEffect(() => {
@@ -165,7 +157,7 @@ function LandingContent() {
     return <img src={url} style={mediaFitStyle} alt="" />;
   };
 
-  useEffect(() => {
+  useEffect(() => { // Efeito para o auto-scroll do carrossel
     if (gallery.length <= 1 || isPaused || manualPause) return;
     const interval = setInterval(() => {
       if (scrollRef.current) {
@@ -176,7 +168,7 @@ function LandingContent() {
     return () => clearInterval(interval);
   }, [gallery, isPaused, manualPause]);
 
-  const navScroll = (direction: 'left' | 'right') => {
+  const navScroll = (direction: 'left' | 'right') => { // Função para navegação manual do carrossel
     if (scrollRef.current) {
       const width = scrollRef.current.clientWidth;
       scrollRef.current.scrollBy({ left: direction === 'right' ? width : -width, behavior: 'smooth' });
@@ -184,14 +176,14 @@ function LandingContent() {
     }
   };
 
-  useEffect(() => {
+  useEffect(() => { // Efeito para carregar o carrinho e identificar o usuário na sessão
     const savedCart = localStorage.getItem(`cart_${id}`);
     if (savedCart && itemsList.length === 0) setItemsList(JSON.parse(savedCart));
     
     const sessionPhone = localStorage.getItem('comprazap_session_phone');
     if (sessionPhone && !contact && !autoPhone) {
       const masked = maskPhone(sessionPhone);
-      setContact(masked);
+      setContact(masked); // Atualiza o estado contact com o telefone mascarado
       identificarUsuario(masked);
     }
   }, [id]);
@@ -203,7 +195,7 @@ function LandingContent() {
   const handleLogout = () => {
     if(!confirm("Deseja alterar o usuário?")) return;
     localStorage.removeItem(`cart_${id}`);
-    localStorage.removeItem('comprazap_session_phone');
+    localStorage.removeItem('comprazap_session_phone'); // Remove o telefone da sessão
     setContact(''); setBuyerName(''); setBuyerApto(''); setPastOrders([]);
     setItemsList([]); setExistingOrder(null); setStep('identificacao');
   };
@@ -215,7 +207,7 @@ function LandingContent() {
     setStep('itens'); 
   };
 
-  const enviarNotificacaoTelegram = async (order: any, itens: any[], receiptUrl?: string) => {
+  const enviarNotificacaoTelegram = useCallback(async (order: any, itens: any[], receiptUrl?: string) => {
     const token = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
     // Utiliza o ID do vendedor carregado do banco, com fallback para o ID padrão
     // Certifique-se de que a coluna 'telegram_id' existe na tabela 'profiles' do Supabase.
@@ -247,10 +239,10 @@ function LandingContent() {
       await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
     } catch (err) { console.error(err); }
-  };
+  }, [campaign?.title, seller?.telegram_id]);
 
   const identificarUsuario = async (phoneToAuth: string) => {
     if (!phoneToAuth || phoneToAuth.length < 10) return;
@@ -286,7 +278,7 @@ function LandingContent() {
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
-
+  
   useEffect(() => {
     if (autoPhone && id && campaign) {
       const cleanAuto = autoPhone.replace(/\D/g, "");
@@ -296,7 +288,7 @@ function LandingContent() {
       }
     }
   }, [autoPhone, id, campaign]);
-
+  
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   useEffect(() => {
@@ -305,8 +297,19 @@ function LandingContent() {
         setOrderStatus(payload.new.status || 'pending');
         if (payload.new.receipt_url) setExistingOrder((prev: any) => ({ ...prev, receipt_url: payload.new.receipt_url }));
     }).subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); }; // Limpa o canal ao desmontar
   }, [existingOrder?.id]);
+
+  // Paleta de cores pastéis para os botões de itens (tons suaves que não conflitam com o verde)
+  const pastelColors = useMemo(() => [
+    '#F0F4FF', // Azul pastel
+    '#FFF1F2', // Rosa suave
+    '#FEFCE8', // Amarelo palha
+    '#F5F3FF', // Lavanda
+    '#F0FDFA', // Turquesa claro
+    '#FFF7ED', // Laranja suave
+    '#F8FAFC', // Cinza azulado
+  ], []);
 
   async function fetchData() {
     try {
@@ -325,13 +328,13 @@ function LandingContent() {
         await supabase.from('campaigns').update({ views: (cp.views || 0) + 1 }).eq('id', id);
       }
 
-      const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).single();
-      
+      const { data: pd } = await supabase.from('products').select('*').eq('campaign_id', id).maybeSingle();
+
       let finalVariations = [];
       if (pd) {
-          if (Array.isArray(pd.variations)) finalVariations = pd.variations;
-          else if (typeof pd.variations === 'string') {
-              try { finalVariations = JSON.parse(pd.variations); } catch(e) { finalVariations = []; }
+          if (Array.isArray(pd.variations)) finalVariations = pd.variations; // Se já for array (jsonb)
+          else if (typeof pd.variations === 'string') { // Se for string (legado ou erro)
+              try { finalVariations = JSON.parse(pd.variations); } catch(e) { finalVariations = []; console.error("Erro ao parsear variações:", e); }
           }
       }
       setProduct({ ...pd, variations: finalVariations });
@@ -339,7 +342,7 @@ function LandingContent() {
       const { data: sl } = await supabase.from('profiles').select('*').eq('id', cp?.creator_id).single();
       setSeller(sl);
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('campaign_id', id).neq('status', 'cancelled');
-      setTotalBuyers(count || 0);
+      setTotalBuyers(count || 0); // Atualiza o contador de compradores
     } catch (e) { console.error(e); } finally { setLoading(false); }
   }
 
@@ -368,7 +371,7 @@ function LandingContent() {
       setOrderStatus(savedOrder?.status || 'pending');
       
       // Notificação em background (sem await para não travar a UI)
-      enviarNotificacaoTelegram(savedOrder, itemsList).catch(err => console.error("Falha notificação:", err));
+      enviarNotificacaoTelegram(savedOrder, itemsList).catch(err => console.error("Falha notificação Telegram:", err));
       
       await trackLead('pedido_concluido', { name: buyerName, unit: buyerApto });
       setStep('concluido');
@@ -383,7 +386,7 @@ function LandingContent() {
   const handleCancelarCompra = async () => {
     if (!existingOrder || !confirm("Cancelar este pedido?")) return;
     setLoading(true);
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id);
+    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', existingOrder.id); // Atualiza o status para 'cancelled'
     setExistingOrder(null); setOrderStatus('pending'); setItemsList([]); setObservations(''); setStep('itens');
     setLoading(false);
   };
@@ -413,7 +416,7 @@ function LandingContent() {
       setExistingOrder((prev: any) => ({ ...prev, receipt_url: publicUrl }));
       setOrderStatus('pending');
       
-      enviarNotificacaoTelegram(existingOrder, itemsList, publicUrl).catch(err => console.error("Falha notificação comprovante:", err));
+      enviarNotificacaoTelegram(existingOrder, itemsList, publicUrl).catch(err => console.error("Falha notificação Telegram comprovante:", err));
       await trackLead('comprovante_enviado');
       alert("Comprovante enviado! ✅");
     } catch (err: any) {
@@ -515,20 +518,32 @@ function LandingContent() {
               {seller?.phone && <a href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 900, color: '#059669', textDecoration: 'none', border: '1px solid #059669', padding: '6px 12px', borderRadius: 50 }}>CONVERSAR COM VENDEDOR 📱</a>}
           </div>
 
+          {/* Exibe as variações (produtos e valores) nos passos de identificação ou seleção para convencer o comprador */}
+          {(step === 'identificacao' || step === 'itens') && (
+            <ProductVariationsDisplay
+              product={product}
+              pastelColors={pastelColors}
+              tempSelection={tempSelection}
+              setTempSelection={setTempSelection}
+              isInteractive={!isExpired && step === 'itens'} 
+              tempQty={tempQty} setTempQty={setTempQty} onAddItem={handleAddItemToList}
+            />
+          )}
+
           {step === 'identificacao' && (
             <div style={{ textAlign: 'center' }}>
-              <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Para iniciar seu pedido, primeiro informe seu número de telefone no Whatsapp</h3>
+              <h3 style={{ fontWeight: 900, marginBottom: 15, fontSize: 16 }}>Para iniciar seu pedido, informe seu número de telefone no Whatsapp abaixo</h3>
               
               {/* AVISO DE CAMPANHA ENCERRADA */}
               {isExpired ? (
                 <div style={{ padding: '20px', backgroundColor: '#fef2f2', borderRadius: '15px', border: '1px solid #fee2e2', marginBottom: '15px' }}>
                   <p style={{ color: '#ef4444', fontWeight: 900, margin: 0, fontSize: '14px' }}>Esta campanha foi encerrada e não aceita novos pedidos. 🛑</p>
-                  <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '10px' }}>Se você já tem um pedido iniciado, informe o número abaixo para continuar.</p>
+                  <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '10px' }}>Se você já tem um pedido iniciado, informe o número abaixo para consultar.</p>
                 </div>
               ) : null}
 
               <input type="tel" placeholder="(00) 00000-0000" style={inputStyle} value={contact} onChange={e => setContact(maskPhone(e.target.value))} />
-              <button onClick={() => identificarUsuario(contact)} style={btnStyle}>ACESSAR OFERTA</button>
+              <button onClick={() => identificarUsuario(contact)} style={btnStyle}>INICIAR COMPRA</button>
             </div>
           )}
 
@@ -564,51 +579,12 @@ function LandingContent() {
           )}
 
           {step === 'itens' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-              <div style={{ background: 'white', padding: 15, borderRadius: 20, border: '1px solid #eee' }}>
-                <p style={{ fontSize: 9, fontWeight: 900, color: '#999', marginBottom: 12, textAlign: 'center', textTransform: 'uppercase' }}>O QUE VOCÊ DESEJA?</p>
-                
-                {/* REFORÇO DA TRAVA: Caso o usuário tente burlar o passo anterior */}
-                {isExpired && !existingOrder ? (
-                  <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#fef2f2', borderRadius: '15px', border: '1px solid #fee2e2' }}>
-                    <p style={{ color: '#ef4444', fontWeight: 900, margin: 0, fontSize: '14px' }}>Esta campanha foi encerrada. 🛑</p>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {product?.variations?.map((v: any, index: number) => (
-                        <button 
-                          key={index} 
-                          onClick={() => setTempSelection(v)} 
-                          style={{ 
-                            padding: '10px 15px', 
-                            borderRadius: '12px', 
-                            border: tempSelection?.name === v.name ? '2px solid #059669' : '1px solid #e2e8f0', 
-                            fontSize: '12px', 
-                            fontWeight: 'bold', 
-                            backgroundColor: tempSelection?.name === v.name ? '#059669' : pastelColors[index % pastelColors.length], 
-                            color: tempSelection?.name === v.name ? 'white' : '#475569',
-                            transition: 'all 0.2s ease',
-                            minWidth: '120px',
-                            boxShadow: tempSelection?.name === v.name ? '0 4px 6px -1px rgba(5, 150, 105, 0.2)' : 'none'
-                          }}
-                        >
-                          {v.name}<br/>
-                          <span style={{fontSize: '13px', fontWeight: 900, color: tempSelection?.name === v.name ? 'white' : '#059669'}}>
-                            R$ {v.price}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 25, marginTop: 20 }}>
-                        <button onClick={() => setTempQty(q => Math.max(1, q-1))} style={{ width: 35, height: 35, borderRadius: '50%', border: '1px solid #ddd', background: 'white' }}>-</button>
-                        <span style={{ fontWeight: 900, fontSize: 18 }}>{tempQty}</span>
-                        <button onClick={() => setTempQty(q => q+1)} style={{ width: 35, height: 35, borderRadius: '50%', border: '1px solid #ddd', background: 'white' }}>+</button>
-                    </div>
-                    <button onClick={() => { if (!tempSelection) return alert("Selecione!"); setItemsList([...itemsList, { id: Date.now(), name: tempSelection.name, price: tempSelection.price, qty: tempQty, total: tempSelection.price * tempQty }]); setTempQty(1); setTempSelection(null); }} style={{ ...btnStyle, backgroundColor: '#000', padding: 14, fontSize: 13, marginTop: 20 }}>ADICIONAR À LISTA</button>
-                  </>
-                )}
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>              
+              {isExpired && !existingOrder && (
+                <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#fef2f2', borderRadius: '15px', border: '1px solid #fee2e2' }}>
+                  <p style={{ color: '#ef4444', fontWeight: 900, margin: 0, fontSize: '14px' }}>Esta campanha foi encerrada. 🛑</p>
+                </div>
+              )}
               
               {itemsList.length > 0 && (
                 <div style={{ background: '#f0fdf4', padding: 15, borderRadius: 20, border: '1px solid #dcfce7' }}>
