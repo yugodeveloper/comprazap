@@ -278,7 +278,13 @@ function LandingContent() {
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
-  
+
+  const handleAddItemToList = () => {
+    if (!tempSelection) return alert("Selecione!");
+    setItemsList([...itemsList, { id: Date.now(), name: tempSelection.name, price: tempSelection.price, qty: tempQty, total: tempSelection.price * tempQty }]);
+    setTempQty(1); setTempSelection(null);
+  };
+
   useEffect(() => {
     if (autoPhone && id && campaign) {
       const cleanAuto = autoPhone.replace(/\D/g, "");
